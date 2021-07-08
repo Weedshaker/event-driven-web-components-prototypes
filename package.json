@@ -1,0 +1,14 @@
+{
+  "name": "event-driven-web-components-prototypes",
+  "version": "0.0.1",
+  "description": "Easy to inherit by other web components and solving common problems.",
+  "main": "./index.html",
+  "scripts": {
+    "fix": "standard --fix"
+  },
+  "author": "weedshaker@gmail.com",
+  "license": "MIT",
+  "devDependencies": {
+    "standard": "*"
+  }
+}
