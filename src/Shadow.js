@@ -164,13 +164,10 @@ export const Shadow = (ChosenHTMLElement = HTMLElement) => class Shadow extends 
         style = style.replace(/:host\s{0,5}/g, `${this.cssSelector} `)
       }
       if (this.namespace) {
-        if (this.hasAttribute('namespace-fallback')) {
-          // only namespace the first statement variable and make it fallback
-          style = style.replace(/:[\s]*var\(--([^),\s]*)([^)]*)/g, `: var(--${this.namespace}$1, var(--$1$2)`)
-          style = style.replace(/([^(]{1})--([^;]*)/g, `$1--${this.namespace}$2;--$2`)
-        } else {
-          style = style.replace(/--/g, `--${this.namespace}`)
-        }
+        if (style.includes('---')) console.error('this.css has illegal dash characters at:', this)
+        if (this.hasAttribute('namespace-fallback')) style = style.replace(/var\(--([^),\s]*)([^)]*)/g, `var(--$1, var(==$1$2)`) // only the namespace of the first statements variable is going to fallback
+        style = style.replace(/--/g, `--${this.namespace}`)
+        if (this.hasAttribute('namespace-fallback')) style = style.replace(/==/g, `--`)
       }
       this._css.textContent += style
     }
