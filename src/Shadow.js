@@ -527,11 +527,13 @@ export const Shadow = (ChosenHTMLElement = HTMLElement) => class Shadow extends 
     // @ts-ignore ignoring self.Environment error
     return this.getAttribute('mobile-breakpoint')
       ? this.getAttribute('mobile-breakpoint')
-      : self.Environment && !!self.Environment.mobileBreakpoint
+      : self.Environment && typeof self.Environment.mobileBreakpoint === 'function'
         ? self.Environment.mobileBreakpoint({
             constructor: this.constructor.name,
             tagName: this.tagName
           })
+        : !!self.Environment.mobileBreakpoint
+        ? self.Environment.mobileBreakpoint
         : '767px'
   }
 }
