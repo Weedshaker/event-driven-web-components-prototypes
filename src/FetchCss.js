@@ -1,12 +1,12 @@
 // @ts-check
 /** @typedef {{
- fetchCSSParams: import("../../prototypes/Shadow.js").fetchCSSParams[],
- resolve: (fetchCSSParams: import("../../prototypes/Shadow.js").fetchCSSParams[]) => fetchCSSParams[],
+ fetchCSSParams: import("./Shadow.js").fetchCSSParams[],
+ resolve: (fetchCSSParams: import("./Shadow.js").fetchCSSParams[]) => fetchCSSParams[],
  node: HTMLElement
 }} fetchCssEventDetail */
 
-import { Shadow } from '../../prototypes/Shadow.js'
-import { WebWorker } from '../../prototypes/WebWorker.js'
+import { Shadow } from './Shadow.js'
+import { WebWorker } from './WebWorker.js'
 
 /* global fetch */
 
@@ -43,8 +43,8 @@ export default class FetchCss extends Shadow(WebWorker()) {
     this.fetchCssListener = event => {
       Promise.all(event.detail.fetchCSSParams.map(
         /**
-         * @param {import("../../prototypes/Shadow.js").fetchCSSParams} fetchCSSParam
-         * @return {Promise<import("../../prototypes/Shadow.js").fetchCSSParams>}
+         * @param {import("./Shadow.js").fetchCSSParams} fetchCSSParam
+         * @return {Promise<import("./Shadow.js").fetchCSSParams>}
          */
         fetchCSSParam => {
           // clean the path of ./ and ../
@@ -52,9 +52,9 @@ export default class FetchCss extends Shadow(WebWorker()) {
           /**
            * add nodes default values
            *
-           * @type {import("../../prototypes/Shadow.js").fetchCSSParams}
+           * @type {import("./Shadow.js").fetchCSSParams}
            */
-          const fetchCSSParamWithDefaultValues = { cssSelector: event.detail.node.cssSelector, namespace: event.detail.node.namespace, namespaceFallback: event.detail.node.namespaceFallback, appendStyleNode: true, maxWidth: event.detail.node.mobileBreakpoint, node: event.detail.node, ...fetchCSSParam }
+          const fetchCSSParamWithDefaultValues = { cssSelector: event.detail.node.cssSelector, namespace: event.detail.node.namespace, namespaceFallback: event.detail.node.namespaceFallback, appendStyleNode: true, maxWidth: event.detail.node.mobileBreakpoint, importMetaUrl: event.detail.node.importMetaUrl, node: event.detail.node, ...fetchCSSParam }
           const processedStyleCacheKey = FetchCss.cacheKeyGenerator(fetchCSSParamWithDefaultValues)
           if (this.processedStyleCache.has(processedStyleCacheKey)) {
             return Promise.resolve(fetchCSSParamWithDefaultValues)
@@ -138,7 +138,7 @@ export default class FetchCss extends Shadow(WebWorker()) {
   /**
    * process the style
    *
-   * @param {import("../../prototypes/Shadow.js").fetchCSSParams} fetchCSSParam
+   * @param {import("./Shadow.js").fetchCSSParams} fetchCSSParam
    * @param {Promise<string>} fetchStyle
    * @return {Promise<string>}
    */
@@ -146,6 +146,7 @@ export default class FetchCss extends Shadow(WebWorker()) {
     let style = await fetchStyle
     // !IMPORTANT: Changes which are made below have to be cloned to src/es/components/web-components-toolbox/src/es/components/prototypes/Shadow.js
     style = await this.webWorker(FetchCss.cssMaxWidth, style, fetchCSSParam.maxWidth)
+    style = await this.webWorker(FetchCss.cssImportMetaUrl, style, fetchCSSParam.importMetaUrl)
     if (fetchCSSParam.cssSelector !== ':host') style = await this.webWorker(FetchCss.cssHostFallback, style, fetchCSSParam.cssSelector)
     if (fetchCSSParam.namespace) {
       if (style.includes('---')) console.error('this.css has illegal dash characters at:', fetchCSSParam.node)
@@ -166,8 +167,8 @@ export default class FetchCss extends Shadow(WebWorker()) {
   /**
    * finalize the style
    *
-   * @param {import("../../prototypes/Shadow.js").fetchCSSParams} fetchCSSParam
-   * @return {import("../../prototypes/Shadow.js").fetchCSSParams}
+   * @param {import("./Shadow.js").fetchCSSParams} fetchCSSParam
+   * @return {import("./Shadow.js").fetchCSSParams}
    */
   static appendStyle (fetchCSSParam) {
     // !IMPORTANT: Changes which are made below have to be cloned to src/es/components/web-components-toolbox/src/es/components/prototypes/Shadow.js
@@ -198,10 +199,10 @@ export default class FetchCss extends Shadow(WebWorker()) {
   /**
    * key generator for cache
    *
-   * @param {import("../../prototypes/Shadow.js").fetchCSSParams} fetchCSSParam
+   * @param {import("./Shadow.js").fetchCSSParams} fetchCSSParam
    * @return {string}
    */
-  static cacheKeyGenerator ({ path, cssSelector, namespace, namespaceFallback, maxWidth }) {
-    return JSON.stringify({ path, cssSelector, namespace, namespaceFallback, maxWidth })
+  static cacheKeyGenerator ({ path, cssSelector, namespace, namespaceFallback, maxWidth, importMetaUrl }) {
+    return JSON.stringify({ path, cssSelector, namespace, namespaceFallback, maxWidth, importMetaUrl })
   }
 }
