@@ -23,7 +23,7 @@ export const WakeLock = (ChosenClass = Shadow()) => class WakeLock extends Chose
 
     this.wakeLock = null
 
-    this.releaseListener = event => console.log('WakeLock released!');
+    this.releaseListener = event => console.log('WakeLock released!')
     this.visibilitychangeListener = event => {
       if (this.wakeLock !== null && document.visibilityState === 'visible') this.requestWakeLock()
     }
@@ -46,7 +46,7 @@ export const WakeLock = (ChosenClass = Shadow()) => class WakeLock extends Chose
       const wakeLockPromise = navigator.wakeLock.request('screen')
       wakeLockPromise.then(wakeLock => {
         this.wakeLock = wakeLock
-        this.wakeLock.addEventListener('release', this.releaseListener, {once: true})
+        this.wakeLock.addEventListener('release', this.releaseListener, { once: true })
       })
       return wakeLockPromise
     } catch (error) {
