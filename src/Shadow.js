@@ -370,7 +370,7 @@ export const Shadow = (ChosenHTMLElement = HTMLElement) => class Shadow extends 
   fetchCSS (fetchCSSParams, hide = true, useController = true) {
     if (hide) this.hidden = true
     if (!Array.isArray(fetchCSSParams)) fetchCSSParams = [fetchCSSParams]
-    if (useController && document.body.hasAttribute(this.getAttribute('fetch-css') || 'fetch-css')) {
+    if (this.isConnected && useController && document.body.hasAttribute(this.getAttribute('fetch-css') || 'fetch-css')) {
       // use: /src/es/components/controllers/fetchCss/FetchCss.js instead of fetching here, to use the cache from within the controller
       return new Promise(
         /**
@@ -380,7 +380,7 @@ export const Shadow = (ChosenHTMLElement = HTMLElement) => class Shadow extends 
          * @return {boolean}
          */
         resolve => this.dispatchEvent(new CustomEvent(this.getAttribute('fetch-css') || 'fetch-css', {
-          /** @type {import("../controllers/fetchCss/FetchCss.js").fetchCssEventDetail} */
+          /** @type {import("./FetchCss.js").fetchCssEventDetail} */
           detail: {
             fetchCSSParams,
             resolve,
@@ -467,7 +467,7 @@ export const Shadow = (ChosenHTMLElement = HTMLElement) => class Shadow extends 
                 styleNode.setAttribute('_css', path)
                 styleNode.setAttribute('mobile-breakpoint', maxWidth)
                 styleNode.setAttribute('protected', 'true') // this will avoid deletion by html=''
-                if (this.root.querySelector(`[_css="${path}"]`)) console.warn(`${path} got imported more than once!!!`, node)
+                if (this.root.querySelector(this.cssSelector + ` > [_css="${path}"]`)) console.warn(`${path} got imported more than once!!!`, node)
               }
               if (appendStyleNode) node.root.appendChild(styleNode) // append the style tag in order to which promise.all resolves
               return { ...fetchCSSParams[i], styleNode, appendStyleNode, node, style: this.setCss(style, cssSelector, namespace, namespaceFallback, styleNode, appendStyleNode, maxWidth, node) }
@@ -490,7 +490,7 @@ export const Shadow = (ChosenHTMLElement = HTMLElement) => class Shadow extends 
   fetchHTML (paths, hide = true, useController = true) {
     if (hide) this.hidden = true
     if (!Array.isArray(paths)) paths = [paths]
-    if (useController && document.body.hasAttribute(this.getAttribute('fetch-html') || 'fetch-html')) {
+    if (this.isConnected && useController && document.body.hasAttribute(this.getAttribute('fetch-html') || 'fetch-html')) {
       // use: /src/es/components/controllers/fetchHtml/FetchHtml.js instead of fetching here, to use the cache from within the controller
       return new Promise(
         /**
@@ -500,7 +500,7 @@ export const Shadow = (ChosenHTMLElement = HTMLElement) => class Shadow extends 
          * @return {boolean}
          */
         resolve => this.dispatchEvent(new CustomEvent(this.getAttribute('fetch-html') || 'fetch-html', {
-          /** @type {import("../controllers/fetchHtml/FetchHtml.js").fetchHtmlEventDetail} */
+          /** @type {import("./FetchHtml.js").fetchHtmlEventDetail} */
           detail: {
             paths,
             resolve,
