@@ -46,6 +46,7 @@ export const WakeLock = (ChosenClass = Shadow()) => class WakeLock extends Chose
    * @return {Promise<WakeLock>}
    */
   requestWakeLock () {
+    if (this.wakeLock) return this.wakeLock
     try {
       // @ts-ignore
       const wakeLockPromise = navigator.wakeLock.request('screen')
