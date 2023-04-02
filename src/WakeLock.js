@@ -57,7 +57,7 @@ export const WakeLock = (ChosenClass = Shadow()) => class WakeLock extends Chose
       })
       return wakeLockPromise
     } catch (error) {
-      return Promise.reject(new Error(`${error.name}, ${error.message}`))
+      return Promise.reject(error)
     }
   }
 
