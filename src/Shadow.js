@@ -12,13 +12,21 @@
   maxWidth?: string,
   importMetaUrl?: string,
   node?: HTMLElement & Shadow & *
+  replaces?: {pattern: string, flags: string, replacement: string}[]
 }} fetchCSSParams */
+/** @typedef {{
+  path: string,
+  name: string,
+  error?: string,
+  constructorClass?: CustomElementConstructor
+}} fetchModulesParams */
 
 /* global HTMLElement */
 /* global document */
 /* global self */
 /* global fetch */
 /* global CustomEvent */
+/* global customElements */
 
 /**
  * Shadow is a helper with a few functions for every web component which possibly allows a shadowRoot (atom, organism and molecule)
@@ -202,9 +210,10 @@ export const Shadow = (ChosenHTMLElement = HTMLElement) => class Shadow extends 
    * @param {boolean} [appendStyleNode = true]
    * @param {string} [maxWidth = this.mobileBreakpoint]
    * @param {HTMLElement & Shadow} [node = this]
+   * @param {{pattern: string, flags: string, replacement: string}[]} [replaces = []]
    * @return {string}
    */
-  setCss (style, cssSelector = this.cssSelector, namespace = this.namespace, namespaceFallback = this.namespaceFallback, styleNode = this._css, appendStyleNode = true, maxWidth = this.mobileBreakpoint, node = this) {
+  setCss (style, cssSelector = this.cssSelector, namespace = this.namespace, namespaceFallback = this.namespaceFallback, styleNode = this._css, appendStyleNode = true, maxWidth = this.mobileBreakpoint, node = this, replaces = []) {
     if (!styleNode) {
     /** @type {HTMLStyleElement} */
       styleNode = document.createElement('style')
@@ -229,6 +238,7 @@ export const Shadow = (ChosenHTMLElement = HTMLElement) => class Shadow extends 
           style = Shadow.cssNamespaceToVar(style, namespace)
         }
       }
+      replaces.forEach(replace => (style = style.replace(new RegExp(replace.pattern, replace.flags), replace.replacement)))
       // TODO: Review the safari fix below, if the bug got fixed within safari itself (NOTE: -webkit prefix did not work for text-decoration-thickness). DONE 2021.11.10 | LAST CHECKED 2021.11.10
       // safari text-decoration un-supported shorthand fix
       if (Shadow.isMac && style.includes('text-decoration:')) style = Shadow.cssTextDecorationShortHandFix(style, node)
@@ -451,13 +461,12 @@ export const Shadow = (ChosenHTMLElement = HTMLElement) => class Shadow extends 
          * @return {fetchCSSParams[]}
          */
         fetchCSSParams => {
-          if (hide) this.hidden = false
-          return fetchCSSParams.map(
+          const result = fetchCSSParams.map(
             /**
              * @param {fetchCSSParams} path, cssSelector, namespace, namespaceFallback, styleNode, appendStyleNode, style, error
              * @return {fetchCSSParams}
              */
-            ({ path, cssSelector, namespace, namespaceFallback, styleNode, style, appendStyleNode = true, error, maxWidth = this.mobileBreakpoint, node = this }, i) => {
+            ({ path, cssSelector, namespace, namespaceFallback, styleNode, style, appendStyleNode = true, error, maxWidth = this.mobileBreakpoint, node = this, replaces = [] }, i) => {
               if (error) return fetchCSSParams[i]
               // !IMPORTANT: Changes which are made below have to be cloned to src/es/components/web-components-toolbox/src/es/components/controllers/fetchCss/FetchCss.js
               // create a new style node if none is supplied
@@ -470,9 +479,12 @@ export const Shadow = (ChosenHTMLElement = HTMLElement) => class Shadow extends 
                 if (this.root.querySelector(this.cssSelector + ` > [_css="${path}"]`)) console.warn(`${path} got imported more than once!!!`, node)
               }
               if (appendStyleNode) node.root.appendChild(styleNode) // append the style tag in order to which promise.all resolves
-              return { ...fetchCSSParams[i], styleNode, appendStyleNode, node, style: this.setCss(style, cssSelector, namespace, namespaceFallback, styleNode, appendStyleNode, maxWidth, node) }
+              // @ts-ignore
+              return { ...fetchCSSParams[i], styleNode, appendStyleNode, node, style: this.setCss(style, cssSelector, namespace, namespaceFallback, styleNode, appendStyleNode, maxWidth, node, replaces) }
             }
           )
+          if (hide) this.hidden = false
+          return result
         }
       ).catch(error => error)
     }
@@ -514,12 +526,12 @@ export const Shadow = (ChosenHTMLElement = HTMLElement) => class Shadow extends 
         /**
          * the controller resolving fetch-html will return with its fetchHtml results
          *
-         * @param {string[]} funcs
+         * @param {string[]} htmls
          * @return {string[]}
          */
-        funcs => {
+        htmls => {
           if (hide) this.hidden = false
-          return funcs
+          return htmls
         }
       )
     } else {
@@ -557,9 +569,9 @@ export const Shadow = (ChosenHTMLElement = HTMLElement) => class Shadow extends 
         )
       )).then(
         /**
-         * Process each paths, make a styleNode if needed and return them with the result of setStyle
+         * Process each paths
          *
-         * @param {string[] | {path, error}[]} htmls
+         * @param {any} htmls
          * @return {string[]}
          */
         htmls => {
@@ -567,8 +579,8 @@ export const Shadow = (ChosenHTMLElement = HTMLElement) => class Shadow extends 
           // @ts-ignore
           return htmls.map(
             /**
-             * @param {string} html
-             * @return {string}
+             * @param {string | {path, error}} html
+             * @return {string | {path, error}}
              */
             html => {
               // @ts-ignore
@@ -576,6 +588,101 @@ export const Shadow = (ChosenHTMLElement = HTMLElement) => class Shadow extends 
               return html
             }
           )
+        }
+      ).catch(error => error)
+    }
+  }
+
+  /**
+   * fetches the modules and defines the custom elements
+   *
+   * @param {fetchModulesParams[]} fetchModulesParams
+   * @param {boolean} [hide = true]
+   * @param {boolean} [useController = true]
+   * @return {Promise<fetchModulesParams[]>}
+   */
+  fetchModules (fetchModulesParams, hide = true, useController = true) {
+    if (hide) this.hidden = true
+    if (!Array.isArray(fetchModulesParams)) fetchModulesParams = [fetchModulesParams]
+    if (this.isConnected && useController && document.body.hasAttribute(this.getAttribute('fetch-modules') || 'fetch-modules')) {
+      // use: /src/es/components/controllers/fetchHtml/FetchHtml.js instead of fetching here, to use the cache from within the controller
+      return new Promise(
+        /**
+         * setup Promise function
+         *
+         * @param {any} resolve
+         * @return {boolean}
+         */
+        resolve => this.dispatchEvent(new CustomEvent(this.getAttribute('fetch-modules') || 'fetch-modules', {
+          /** @type {import("../controllers/fetchModules/FetchModules.js").fetchModulesEventDetail} */
+          detail: {
+            fetchModulesParams,
+            resolve,
+            node: this
+          },
+          bubbles: true,
+          cancelable: true,
+          composed: true
+        }))
+      ).then(
+        /**
+         * the controller resolving fetch-modules will return with its fetchHtml results
+         *
+         * @param {fetchModulesParams[]} resultFetchModulesParams
+         * @return {fetchModulesParams[]}
+         */
+        resultFetchModulesParams => {
+          if (hide) this.hidden = false
+          return resultFetchModulesParams
+        }
+      )
+    } else {
+      return Promise.all(fetchModulesParams.map(
+        /**
+         * fetch each fetchHTMLParam.paths and return the promise
+         *
+         * @param {fetchModulesParams} fetchModulesParam
+         * @return {Promise<fetchModulesParams>}
+         */
+        fetchModulesParam => (import(fetchModulesParam.path).then(
+          /**
+           * return the paths with the response.text or an Error
+           *
+           * @param {any} module
+           * @return {fetchModulesParams}
+           */
+          module => {
+            let constructorClass = module.default || module
+            if (typeof constructorClass === 'object') constructorClass = constructorClass[Object.keys(constructorClass)[0]]()
+            if (!customElements.get(fetchModulesParam.name)) customElements.define(fetchModulesParam.name, constructorClass)
+            fetchModulesParam.constructorClass = constructorClass
+            return fetchModulesParam
+          }
+        )).catch(
+          /**
+           * Return the paths with the attached error
+           *
+           * @param {string} error
+           * @return {fetchModulesParams}
+           */
+          error => {
+            if (hide) this.hidden = false
+            error = `${fetchModulesParam.path} ${error}!!!`
+            // @ts-ignore
+            return { ...fetchModulesParam, error: (this.html = console.error(error, this) || `<code style="color: red;">${error}</code>`) }
+          }
+        )
+      )).then(
+        /**
+         * Unhide
+         *
+         * @param {fetchModulesParams[]} fetchModulesParams
+         * @return {fetchModulesParams[]}
+         */
+        fetchModulesParams => {
+          if (hide) this.hidden = false
+          // @ts-ignore
+          return fetchModulesParams
         }
       ).catch(error => error)
     }
@@ -618,9 +725,11 @@ export const Shadow = (ChosenHTMLElement = HTMLElement) => class Shadow extends 
     // @ts-ignore
     if (innerHTML.length === undefined) innerHTML = [innerHTML]
     // @ts-ignore
-    Array.from(innerHTML).forEach(node => {
-      if (node) this.root.appendChild(node)
-    })
+    Array.from(innerHTML).forEach(
+      node => {
+        // @ts-ignore
+        if (node) this.root.appendChild(node)
+      })
   }
 
   // display trumps hidden property, which we resolve here as well as we allow an animation on show
@@ -634,13 +743,22 @@ export const Shadow = (ChosenHTMLElement = HTMLElement) => class Shadow extends 
     }
     this._cssHidden.textContent = ''
     value ? this.setAttribute('aria-hidden', 'true') : this.removeAttribute('aria-hidden')
+    // the hidden setter is always executed and the a color change issue with browser default styles can't be solved anywhere else than directly here
+    const generalFix = /* css */`
+      a {
+        color: var(--color, inherit);
+        text-decoration: var(--text-decoration, inherit);
+      }
+    `
     this.setCss(value
       ? /* css */`
+        ${generalFix}
         :host {
           visibility: hidden !important;
         }
       `
       : /* css */`
+        ${generalFix}
         :host, :host > *, :host > * > * {
           animation: var(--show, show .3s ease-out);
         }
