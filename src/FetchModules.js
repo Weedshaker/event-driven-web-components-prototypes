@@ -92,7 +92,7 @@ export default class FetchModules extends HTMLElement {
        * Return the paths with the attached error
        *
        * @param {string} error
-       * @return {import("../../prototypes/Shadow.js").fetchModulesParams}
+       * @return {import("./Shadow.js").fetchModulesParams}
        */
       error => {
         error = `${fetchModulesParam.path} ${error}!!!`
