@@ -1,6 +1,7 @@
 // @ts-check
 /** @typedef {{
- fetchModulesParams: import("../../prototypes/Shadow.js").fetchModulesParams[],
+ fetchModulesParams: import("./Shadow.js").fetchModulesParams[],
+ defineImmediately: boolean,
  resolve: (paths: string[]) => paths[],
  node: HTMLElement
 }} fetchModulesEventDetail */
@@ -24,9 +25,23 @@ export default class FetchModules extends HTMLElement {
     /**
      * caching the fetched style by path
      *
-     * @type {Map<string, Promise<import("../../prototypes/Shadow.js").fetchModulesParams>>}
+     * @type {Map<string, Promise<import("./Shadow.js").fetchModulesParams>>}
      */
     this.fetchModulesCache = new Map()
+    /**
+     * customElements define
+     *
+     * @param {any} module
+     * @param {import("./Shadow.js").fetchModulesParams} fetchModulesParam
+     * @return {import("./Shadow.js").fetchModulesParams}
+     */
+    const define = (module, fetchModulesParam) => {
+      let constructorClass = module.default || module
+      if (typeof constructorClass === 'object') constructorClass = constructorClass[Object.keys(constructorClass)[0]]()
+      if (!customElements.get(fetchModulesParam.name)) customElements.define(fetchModulesParam.name, constructorClass)
+      fetchModulesParam.constructorClass = constructorClass
+      return fetchModulesParam
+    }
     /**
      * Listens to the event 'fetch-modules' and resolve it with the paths returned by fetchModules
      *
@@ -35,8 +50,8 @@ export default class FetchModules extends HTMLElement {
     this.fetchModulesListener = event => {
       Promise.all(event.detail.fetchModulesParams.map(
         /**
-         * @param {import("../../prototypes/Shadow.js").fetchModulesParams} fetchModulesParam
-         * @return {Promise<import("../../prototypes/Shadow.js").fetchModulesParams>}
+         * @param {import("./Shadow.js").fetchModulesParams} fetchModulesParam
+         * @return {Promise<import("./Shadow.js").fetchModulesParams>}
          */
         fetchModulesParam => {
           // clean the path of ./ and ../
@@ -45,12 +60,15 @@ export default class FetchModules extends HTMLElement {
           if (this.fetchModulesCache.has(path)) {
             fetchModules = this.fetchModulesCache.get(path)
           } else {
-            this.fetchModulesCache.set(path, (fetchModules = FetchModules.fetchModules(fetchModulesParam)))
+            this.fetchModulesCache.set(path, (fetchModules = FetchModules.fetchModules(fetchModulesParam, define, event.detail.defineImmediately)))
           }
           // @ts-ignore
           return fetchModules
         }
-      )).then(modules => event.detail.resolve(modules)).catch(error => error)
+      )).then(modules => {
+        if (!event.detail.defineImmediately) modules.forEach(module => define(module.constructorClass, module))
+        return event.detail.resolve(modules)
+      }).catch(error => error)
     }
   }
 
@@ -69,24 +87,22 @@ export default class FetchModules extends HTMLElement {
   /**
    * fetch the module
    *
-   * @param {import("../../prototypes/Shadow.js").fetchModulesParams} fetchModulesParam
-   * @return {Promise<import("../../prototypes/Shadow.js").fetchModulesParams>}
+   * @param {import("./Shadow.js").fetchModulesParams} fetchModulesParam
+   * @param {(module: any, fetchModulesParam: import("./Shadow.js").fetchModulesParams) => import("./Shadow.js").fetchModulesParams} define
+   * @param {boolean} defineImmediately
+   * @return {Promise<import("./Shadow.js").fetchModulesParams>}
    */
-  static fetchModules (fetchModulesParam) {
+  static fetchModules (fetchModulesParam, define, defineImmediately) {
     return import(fetchModulesParam.path).then(
       /**
        * return the paths with the response.text or an Error
        *
        * @param {any} module
-       * @return {import("../../prototypes/Shadow.js").fetchModulesParams}
+       * @return {import("./Shadow.js").fetchModulesParams}
        */
-      module => {
-        let constructorClass = module.default || module
-        if (typeof constructorClass === 'object') constructorClass = constructorClass[Object.keys(constructorClass)[0]]()
-        if (!customElements.get(fetchModulesParam.name)) customElements.define(fetchModulesParam.name, constructorClass)
-        fetchModulesParam.constructorClass = constructorClass
-        return fetchModulesParam
-      }
+      module => defineImmediately
+        ? define(module, fetchModulesParam)
+        : Object.assign(fetchModulesParam, { constructorClass: module })
     ).catch(
       /**
        * Return the paths with the attached error
