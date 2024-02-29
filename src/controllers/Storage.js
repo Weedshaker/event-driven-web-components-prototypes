@@ -3,7 +3,8 @@
 /* global HTMLElement */
 /* global localStorage */
 
-/** @typedef { WindowLocalStorage | WindowSessionStorage } STORAGE_TYPE_INTERFACE */
+/** @typedef { WindowLocalStorage | WindowSessionStorage | any } STORAGE */
+/** @typedef { STORAGE } STORAGE_TYPE_INTERFACE */
 const STORAGE_TYPE = {
   localStorage: localStorage,
   sessionStorage: sessionStorage,
@@ -23,44 +24,53 @@ export default class Storage extends HTMLElement {
   constructor () {
     super()
 
-    /** @type {string | null} */
-    let lastTimes = null
+    this.oldStorage = new Map()
 
     /**
      * Listens to the event name/typeArg: 'set'
      *
-     * @param {CustomEvent & {detail: { key: string, value: any, storageType?: 'localStorage' }}} event
-     * @return {void}
+     * @param {CustomEvent & {detail: { key: string, value: any, storageType?: 'localStorage' }} | string | any} event
+     * @param {any} [value=undefined]
+     * @param {Storage} [storage=undefined]
+     * @return {boolean}
      */
-    this.setListener = event => {
-      if (event.detail.key === undefined) return this.respond(event.detail.resolve, undefined, {key: null, value: null, message: 'Key is missing!', error: true})
-      if (event.detail.value === undefined) return this.respond(event.detail.resolve, undefined, {key: event.detail.key, value: this.getListener(event.detail.key), message: 'Value is missing!', error: true})
+    this.setListener = (event, value, storage) => {
+      const key = typeof event === 'string'
+        ? event
+        : event.detail.key
+      if (!key.trim()) return this.respond(event.detail?.resolve, undefined, {key: null, value: null, message: 'Key is missing!', error: true}) || false
+      if (!value && event.detail?.value) value = event.detail.value
+      if (value === undefined) return this.respond(event.detail?.resolve, undefined, {key, value: this.getListener(key, event.detail?.storageType || storage), message: 'Value is missing!', error: true}) || false
       try {
-        let newData
-        this.getStorage(event.detail.storageType).setItem(event.detail.key, JSON.stringify(newData = Object.assign(this.getListener(event.detail.key), event.detail.value)))
-        this.respond(event.detail.resolve, 'storage-data', {key: event.detail.key, value: newData, message: 'Success!', error: false})
+        const oldValue = this.getListener(key, event.detail?.storageType || storage)
+        this.oldStorage.set(key, oldValue)
+        let newValue
+        this.getStorage(event.detail?.storageType || storage).setItem(key, JSON.stringify(newValue = Object.assign(oldValue, value)))
+        this.respond(event.detail?.resolve, 'storage-data', {key, value: newValue, message: 'Success!', error: false})
       } catch (error) {
-        this.respond(event.detail.resolve, undefined, {key: event.detail.key, value: this.getListener(event.detail.key), message: `Most likely error at JSON.stringify: ${error}`, error: true})
-      } 
+        return this.respond(event.detail?.resolve, undefined, {key, value: this.getListener(key, event.detail?.storageType || storage), message: `Error at setItem, most likely error at JSON.stringify: ${error}`, error: true}) || false
+      }
+      return true
     }
 
     /**
      * Listens to the event name/typeArg: 'get'
      *
      * @param {CustomEvent & {detail: {key: string, storageType?: 'localStorage'}} | string | any} event
+     * @param {Storage} [storage=undefined]
      * @return {any}
      */
-    this.getListener = event => {
+    this.getListener = (event, storage) => {
       let value = null
       const key = typeof event === 'string'
         ? event
         : event.detail.key
       if (!key.trim()) return this.respond(event.detail?.resolve, undefined, {key: null, value: null, message: 'Key is missing!', error: true}) || value
       try {
-        const found = this.getStorage(event.detail.storageType).hasOwnProperty(key)
+        const found = this.getStorage(event.detail?.storageType || storage).hasOwnProperty(key)
         this.respond(event.detail?.resolve, 'storage-data', {
           key,
-          value: (value = JSON.parse(this.getStorage(event.detail.storageType).getItem(key) || '{}')),
+          value: (value = JSON.parse(this.getStorage(event.detail?.storageType || storage).getItem(key) || '{}')),
           message: found
             ? 'Success!'
             : 'Item not found!',
@@ -69,7 +79,7 @@ export default class Storage extends HTMLElement {
             : true
         })
       } catch (error) {
-        this.respond(event.detail?.resolve, undefined, {key, value: null, message: `Most likely error at JSON.parse: ${error}`, error: true})
+        this.respond(event.detail?.resolve, undefined, {key, value: null, message: `Error at getItem, most likely error at JSON.parse: ${error}`, error: true})
       }
       return value
     }
@@ -77,34 +87,61 @@ export default class Storage extends HTMLElement {
     /**
      * Listens to the event name/typeArg: 'remove'
      *
-     * @param {CustomEvent & {detail: RemoveTimeDetail}} event
+     * @param {CustomEvent & {detail: {key: string, storageType?: 'localStorage'}} | string | any} event
+     * @param {Storage} [storage=undefined]
      * @return {void}
      */
-    this.removeListener = event => {
-      if (event && event.detail && event.detail.date && event.detail.time) {
-        let times = this.getListener()
-        const key = event.detail.date
-        if (key in times) {
-          lastTimes = JSON.stringify(times)
-          times[key].splice(times[key].indexOf(event.detail.time), 1)
-          if (!times[key].length) delete times[key]
-          this.getStorage(event.detail.storageType).setItem('times', JSON.stringify(times))
-        }
-        if (typeof event.detail.resolve == 'function') event.detail.resolve(times)
+    this.removeListener = (event, storage) => {
+      const key = typeof event === 'string'
+        ? event
+        : event.detail.key
+      if (!key.trim()) return this.respond(event.detail?.resolve, undefined, {key: null, value: null, message: 'Key is missing!', error: true})
+      try {
+        const oldValue = this.getListener(key, event.detail?.storageType || storage)
+        this.oldStorage.set(key, oldValue)
+        this.getStorage(event.detail?.storageType || storage).removeItem(key)
+        this.respond(event.detail?.resolve, 'storage-data-removed', {
+          key,
+          value: oldValue,
+          message: 'Success!',
+          error: false
+        })
+      } catch (error) {
+        this.respond(event.detail?.resolve, undefined, {key: key, value: null, message: `Error at removeItem: ${error}`, error: true})
       }
     }
 
     /**
      * Listens to the event name/typeArg: 'undo'
      *
-     * @param {CustomEvent & {detail: UndoTimeDetail}} event
+     * @param {CustomEvent & {detail: {key: string, storageType?: 'localStorage'}} | any} event
      * @return {void}
      */
     this.undoListener = event => {
-      if (lastTimes) {
-        this.getStorage(event.detail.storageType).setItem('times', lastTimes)
-        if (event && event.detail && typeof event.detail.resolve == 'function') event.detail.resolve(JSON.parse(lastTimes))
-        lastTimes = null
+      if (!event.detail.key.trim()) return this.respond(event.detail.resolve, undefined, {key: null, value: null, message: 'Key is missing!', error: true})
+      const oldValue = this.oldStorage.get(event.detail.key)
+      if (oldValue) {
+        try {
+          let success
+          this.removeListener(event.detail.key, event.detail.storage)
+          this.respond(event.detail.resolve, 'storage-data-undone', {
+            key: event.detail.key,
+            value: (success = this.setListener(event.detail.key, oldValue, event.detail.storage))
+              ? oldValue
+              : this.getListener(event.detail.key, event.detail.storageType),
+            message: success
+              ? 'Success!'
+              : 'Not undone!',
+            error: success
+              ? false
+              : true
+          })
+          this.oldStorage.delete(event.detail.key)
+        } catch (error) {
+          this.respond(event.detail.resolve, undefined, {key: event.detail.key, value: this.getListener(event.detail.key, event.detail.storageType), message: `Error at undo: ${error}`, error: true})
+        }
+      } else {
+        this.respond(event.detail.resolve, undefined, {key: event.detail.key, value: this.getListener(event.detail.key, event.detail.storageType), message: 'No old value to undo!', error: true})
       }
     }
   }
@@ -123,6 +160,14 @@ export default class Storage extends HTMLElement {
     this.removeEventListener(this.getAttribute('storage-undo') || 'storage-undo', this.undoListener)
   }
 
+  /**
+   *
+   *
+   * @param {(any)=>void} resolve
+   * @param {string|undefined} name
+   * @param {any} detail
+   * @return {void | any}
+   */
   respond (resolve, name, detail) {
     if (typeof resolve === 'function') return resolve(detail)
     if (typeof name === 'string') this.dispatchEvent(new CustomEvent(name, {
@@ -133,7 +178,10 @@ export default class Storage extends HTMLElement {
     }))
   }
 
-  /** @return {STORAGE_TYPE_INTERFACE} */
+  /**
+   * @param {'localStorage' | 'sessionStorage'} [type='localStorage']
+   * @return {STORAGE}
+   */
   getStorage (type) {
     return STORAGE_TYPE[type] || STORAGE_TYPE[this.getAttribute('storage-type')] || STORAGE_TYPE.default
   }
