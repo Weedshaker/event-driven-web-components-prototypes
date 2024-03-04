@@ -32,12 +32,14 @@ export const WebWorker = (ChosenHTMLElement = HTMLElement) => class WebWorker ex
   webWorker (func, ...args) {
     const key = func = typeof func === 'string' ? func : func.toLocaleString()
     if (this.webWorkerMap.has(key)) {
+      // @ts-ignore
       const { worker, promise } = this.webWorkerMap.get(key)
       const newPromise = WebWorker.getWebWorkerPromise(worker, args, promise)
       this.webWorkerMap.set(key, { worker, promise: newPromise })
       return newPromise
     }
     func = func.replace(/this\./g, '')
+    func = func.replace(new RegExp(`${this.constructor.name}\.`, 'g'), '')
     func = /^.*?=>.*?/.test(func) ? `(${func})` : !/^function/.test(func) ? `function ${func}` : func
     const response = `onmessage=(event)=>{postMessage(${func}(...event.data))}`
     let blob
