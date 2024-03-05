@@ -37,18 +37,19 @@ export default class Storage extends WebWorker() {
      * @return {boolean}
      */
     this.setListener = (event, value, storage) => {
+      storage = event.detail?.storageType || storage
       const key = typeof event === 'string'
         ? event
         : event.detail.key
       if (!key.trim()) return this.respond(event.detail?.resolve, undefined, {key: null, value: null, message: 'Key is missing!', error: true}) || false
       if (!value && event.detail?.value) value = event.detail.value
-      if (value === undefined) return this.respond(event.detail?.resolve, undefined, {key, value: this.getListener(key, event.detail?.storageType || storage), message: 'Value is missing!', error: true}) || false
+      if (value === undefined) return this.respond(event.detail?.resolve, undefined, {key, value: this.getListener(key, storage), message: 'Value is missing!', error: true}) || false
       try {
-        this.oldStorage.set(key, structuredClone(this.getListener(key, event.detail?.storageType || storage)))
-        this.getStorage(event.detail?.storageType || storage).setItem(key, JSON.stringify(value))
+        this.oldStorage.set(key, structuredClone(this.getListener(key, storage)))
+        this.getStorage(storage).setItem(key, JSON.stringify(value))
         this.respond(event.detail?.resolve, 'storage-data', {key, value, command: 'set', message: 'Success!', error: false})
       } catch (error) {
-        return this.respond(event.detail?.resolve, undefined, {key, value: this.getListener(key, event.detail?.storageType || storage), message: `Error at setItem, most likely error at JSON.stringify: ${error}`, error: true}) || false
+        return this.respond(event.detail?.resolve, undefined, {key, value: this.getListener(key, storage), message: `Error at setItem, most likely error at JSON.stringify: ${error}`, error: true}) || false
       }
       return true
     }
@@ -56,26 +57,27 @@ export default class Storage extends WebWorker() {
     /**
     * Listens to the event name/typeArg: 'merge'
     *
-    * @param {CustomEvent & {detail: { key: string, value: any, storageType?: 'localStorage' }} | string | any} event
+    * @param {CustomEvent & {detail: { key: string, value: any, storageType?: 'localStorage', concat?: boolean }} | string | any} event
     * @param {any} [value=undefined]
     * @param {Storage} [storage=undefined]
     * @return {Promise<boolean>}
     */
     this.mergeListener = async (event, value, storage) => {
+      storage = event.detail?.storageType || storage
       const key = typeof event === 'string'
         ? event
         : event.detail.key
       if (!key.trim()) return this.respond(event.detail?.resolve, undefined, {key: null, value: null, message: 'Key is missing!', error: true}) || false
       if (!value && event.detail?.value) value = event.detail.value
-      if (value === undefined) return this.respond(event.detail?.resolve, undefined, {key, value: this.getListener(key, event.detail?.storageType || storage), message: 'Value is missing!', error: true}) || false
+      if (value === undefined) return this.respond(event.detail?.resolve, undefined, {key, value: this.getListener(key, storage), message: 'Value is missing!', error: true}) || false
       try {
-        const oldValue = this.getListener(key, event.detail?.storageType || storage)
+        const oldValue = this.getListener(key, storage)
         this.oldStorage.set(key, structuredClone(oldValue))
-        const newValue = await this.webWorker(Storage.deepMerge, oldValue, value)
+        const newValue = await this.webWorker(Storage.deepMerge, oldValue, value, event.detail?.concat)
         let success
         this.respond(event.detail?.resolve, 'storage-data', {
           key,
-          value: (success = this.setListener(key, newValue, event.detail?.storageType || storage))
+          value: (success = this.setListener(key, newValue, storage))
             ? newValue
             : oldValue,
           command: 'merge',
@@ -87,7 +89,7 @@ export default class Storage extends WebWorker() {
             : true
         })
       } catch (error) {
-        return this.respond(event.detail?.resolve, undefined, {key, value: this.getListener(key, event.detail?.storageType || storage), message: `Error at mergeItem, most likely error at JSON.stringify: ${error}`, error: true}) || false
+        return this.respond(event.detail?.resolve, undefined, {key, value: this.getListener(key, storage), message: `Error at mergeItem, most likely error at JSON.stringify: ${error}`, error: true}) || false
       }
       return true
     }
@@ -100,16 +102,17 @@ export default class Storage extends WebWorker() {
      * @return {any}
      */
     this.getListener = (event, storage) => {
+      storage = event.detail?.storageType || storage
       let value = null
       const key = typeof event === 'string'
         ? event
         : event.detail.key
       if (!key.trim()) return this.respond(event.detail?.resolve, undefined, {key: null, value: null, message: 'Key is missing!', error: true}) || value
       try {
-        const found = this.getStorage(event.detail?.storageType || storage).hasOwnProperty(key)
+        const found = this.getStorage(storage).hasOwnProperty(key)
         this.respond(event.detail?.resolve, 'storage-data', {
           key,
-          value: (value = JSON.parse(this.getStorage(event.detail?.storageType || storage).getItem(key) || '{}')),
+          value: (value = JSON.parse(this.getStorage(storage).getItem(key) || '{}')),
           command: 'get',
           message: found
             ? 'Success!'
@@ -132,13 +135,14 @@ export default class Storage extends WebWorker() {
      * @return {void}
      */
     this.removeListener = (event, storage) => {
+      storage = event.detail?.storageType || storage
       const key = typeof event === 'string'
         ? event
         : event.detail.key
       if (!key.trim()) return this.respond(event.detail?.resolve, undefined, {key: null, value: null, message: 'Key is missing!', error: true})
       try {
-        this.oldStorage.set(key, this.getListener(key, event.detail?.storageType || storage))
-        this.getStorage(event.detail?.storageType || storage).removeItem(key)
+        this.oldStorage.set(key, this.getListener(key, storage))
+        this.getStorage(storage).removeItem(key)
         this.respond(event.detail?.resolve, 'storage-data', {
           key,
           value: null,
@@ -223,10 +227,10 @@ export default class Storage extends WebWorker() {
   }
 
   /**
-   * @param {'localStorage' | 'sessionStorage'} [type='localStorage']
+   * @param {'localStorage' | 'sessionStorage' | any} [type=undefined]
    * @return {STORAGE}
    */
-  getStorage (type) {
+  getStorage (type = undefined) {
     return STORAGE_TYPE[type] || STORAGE_TYPE[this.getAttribute('storage-type')] || STORAGE_TYPE.default
   }
 
@@ -235,20 +239,25 @@ export default class Storage extends WebWorker() {
    * Source overwrites target and also dictates if it is an Array or Object
    * source Object merge with target Array sets the position of target Array number as key in Object
    * source Array merge with target Object takes the Object keys and pushes them in order to the array (makes it backwards compatible with source Object merge with target Array)
-   * source Array merge with target Array merges the positions hard together (Note: Write a deepStrictEqual comparison, which would be an alternative to overwrite at dynamic position)
-   *
+   * concat for Arrays insert all values from target
+   * 
    * @static
    * @param {any} target
    * @param {any} source
+   * @param {boolean} [concat=true]
    * @return {any}
    */
-  static deepMerge(target, source) {
+  static deepMerge(target, source, concat = true) {
     if (typeof target !== 'object' || typeof source !== 'object') return structuredClone(source === undefined ? target : source)
     let result
     if (Array.isArray(source)) {
-      result = []
-      for (let i = 0; i < Math.max(target.length || Object.keys(target).length || 0, source.length || 0); i++) {
-        result.push(Storage.deepMerge(target[i] || target[Object.keys(target)[i]], source[i]))
+      if (concat) {
+        result = [...(Array.isArray(target) ? target : Object.values(target)), ...source]
+      } else {
+        result = []
+        for (let i = 0; i < Math.max(target.length || Object.keys(target).length || 0, source.length || 0); i++) {
+          result.push(Storage.deepMerge(target[i] || target[Object.keys(target)[i]], source[i]))
+        }
       }
     } else {
       result = {}
