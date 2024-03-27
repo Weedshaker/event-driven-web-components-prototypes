@@ -54,6 +54,8 @@ export default class Storage extends WebWorker() {
       return true
     }
     
+    // wait for previous merge to finish before running next merge since the web worker is async
+    this.queue = []
     /**
     * Listens to the event name/typeArg: 'merge'
     *
@@ -71,9 +73,17 @@ export default class Storage extends WebWorker() {
       if (!value && event.detail?.value) value = event.detail.value
       if (value === undefined) return this.respond(event.detail?.resolve, undefined, {key, value: this.getListener(key, storage), message: 'Value is missing!', error: true}) || false
       try {
+        const queuePromiseAll = Promise.all(this.queue)
+        let queueResolve
+        const queuePromise = new Promise(resolve => (queueResolve = resolve))
+        this.queue.push(queuePromise)
+        await queuePromiseAll
         const oldValue = this.getListener(key, storage)
         this.oldStorage.set(key, structuredClone(oldValue))
-        const newValue = await this.webWorker(Storage.deepMerge, oldValue, value, event.detail?.concat)
+        const newValue = await this.webWorker(Storage.deepMerge, oldValue, value, event.detail?.concat, event.detail?.maxLength)
+        // @ts-ignore
+        queueResolve()
+        this.queue.splice(this.queue.indexOf(queuePromise), 1)
         let success
         this.respond(event.detail?.resolve, 'storage-data', {
           key,
@@ -190,6 +200,10 @@ export default class Storage extends WebWorker() {
         this.respond(event.detail.resolve, undefined, {key: event.detail.key, value: this.getListener(event.detail.key, event.detail.storageType), message: 'No old value to undo!', error: true})
       }
     }
+
+    this.deepMergeListener = async event => {
+      this.respond(event.detail.resolve, undefined, {value: await this.webWorker(Storage.deepMerge, event.detail.target, event.detail.source, event.detail.concat, event.detail.maxLength)})
+    }
   }
 
   connectedCallback () {
@@ -198,6 +212,7 @@ export default class Storage extends WebWorker() {
     this.addEventListener(this.getAttribute('storage-get') || 'storage-get', this.getListener)
     this.addEventListener(this.getAttribute('storage-remove') || 'storage-remove', this.removeListener)
     this.addEventListener(this.getAttribute('storage-undo') || 'storage-undo', this.undoListener)
+    this.addEventListener(this.getAttribute('storage-deep-merge') || 'storage-deep-merge', this.deepMergeListener)
   }
 
   disconnectedCallback () {
@@ -206,6 +221,7 @@ export default class Storage extends WebWorker() {
     this.removeEventListener(this.getAttribute('storage-get') || 'storage-get', this.getListener)
     this.removeEventListener(this.getAttribute('storage-remove') || 'storage-remove', this.removeListener)
     this.removeEventListener(this.getAttribute('storage-undo') || 'storage-undo', this.undoListener)
+    this.removeEventListener(this.getAttribute('storage-deep-merge') || 'storage-deep-merge', this.deepMergeListener)
   }
 
   /**
@@ -244,25 +260,29 @@ export default class Storage extends WebWorker() {
    * @static
    * @param {any} target
    * @param {any} source
-   * @param {boolean} [concat=true]
+   * @param {boolean|'unshift'} [concat=true]
+   * @param {false | number} [maxLength = false]
    * @return {any}
    */
-  static deepMerge(target, source, concat = true) {
+  static deepMerge(target, source, concat = true, maxLength = false) {
     if (typeof target !== 'object' || typeof source !== 'object') return structuredClone(source === undefined ? target : source)
     let result
     if (Array.isArray(source)) {
       if (concat) {
-        result = [...(Array.isArray(target) ? target : Object.values(target)), ...source]
+        result = concat === 'unshift'
+          ? [...source, ...(Array.isArray(target) ? target : Object.values(target))]
+          : [...(Array.isArray(target) ? target : Object.values(target)), ...source]
       } else {
         result = []
         for (let i = 0; i < Math.max(target.length || Object.keys(target).length || 0, source.length || 0); i++) {
-          result.push(Storage.deepMerge(target[i] || target[Object.keys(target)[i]], source[i]))
+          result.push(Storage.deepMerge(target[i] || target[Object.keys(target)[i]], source[i], concat, maxLength))
         }
       }
+      if (maxLength && result.length > maxLength) result.length = maxLength
     } else {
       result = {}
       for (const key of new Set([...Object.keys(target), ...Object.keys(source)])) {
-        result[key] = Storage.deepMerge(target[key], source[key])
+        result[key] = Storage.deepMerge(target[key], source[key], concat, maxLength)
       }
     }
     return result
