@@ -2,14 +2,14 @@
 
 import { WebWorker } from '../WebWorker.js'
 
-/* global HTMLElement */
 /* global localStorage */
+/* global sessionStorage */
 
 /** @typedef { WindowLocalStorage | WindowSessionStorage | any } STORAGE */
 /** @typedef { STORAGE } STORAGE_TYPE_INTERFACE */
 const STORAGE_TYPE = {
-  localStorage: localStorage,
-  sessionStorage: sessionStorage,
+  localStorage,
+  sessionStorage,
   get default () {
     return this.localStorage
   }
@@ -41,19 +41,19 @@ export default class Storage extends WebWorker() {
       const key = typeof event === 'string'
         ? event
         : event.detail.key
-      if (!key.trim()) return this.respond(event.detail?.resolve, undefined, {key: null, value: null, message: 'Key is missing!', error: true}) || false
+      if (!key.trim()) return this.respond(event.detail?.resolve, undefined, { key: null, value: null, message: 'Key is missing!', error: true }) || false
       if (!value && event.detail?.value) value = event.detail.value
-      if (value === undefined) return this.respond(event.detail?.resolve, undefined, {key, value: this.getListener(key, storage), message: 'Value is missing!', error: true}) || false
+      if (value === undefined) return this.respond(event.detail?.resolve, undefined, { key, value: this.getListener(key, storage), message: 'Value is missing!', error: true }) || false
       try {
         this.oldStorage.set(key, structuredClone(this.getListener(key, storage)))
         this.getStorage(storage).setItem(key, JSON.stringify(value))
-        this.respond(event.detail?.resolve, 'storage-data', {key, value, command: 'set', message: 'Success!', error: false})
+        this.respond(event.detail?.resolve, 'storage-data', { key, value, command: 'set', message: 'Success!', error: false })
       } catch (error) {
-        return this.respond(event.detail?.resolve, undefined, {key, value: this.getListener(key, storage), message: `Error at setItem, most likely error at JSON.stringify: ${error}`, error: true}) || false
+        return this.respond(event.detail?.resolve, undefined, { key, value: this.getListener(key, storage), message: `Error at setItem, most likely error at JSON.stringify: ${error}`, error: true }) || false
       }
       return true
     }
-    
+
     // wait for previous merge to finish before running next merge since the web worker is async
     this.queue = []
     /**
@@ -69,9 +69,9 @@ export default class Storage extends WebWorker() {
       const key = typeof event === 'string'
         ? event
         : event.detail.key
-      if (!key.trim()) return this.respond(event.detail?.resolve, undefined, {key: null, value: null, message: 'Key is missing!', error: true}) || false
+      if (!key.trim()) return this.respond(event.detail?.resolve, undefined, { key: null, value: null, message: 'Key is missing!', error: true }) || false
       if (!value && event.detail?.value) value = event.detail.value
-      if (value === undefined) return this.respond(event.detail?.resolve, undefined, {key, value: this.getListener(key, storage), message: 'Value is missing!', error: true}) || false
+      if (value === undefined) return this.respond(event.detail?.resolve, undefined, { key, value: this.getListener(key, storage), message: 'Value is missing!', error: true }) || false
       try {
         const queuePromiseAll = Promise.all(this.queue)
         let queueResolve
@@ -84,26 +84,24 @@ export default class Storage extends WebWorker() {
         // @ts-ignore
         queueResolve()
         this.queue.splice(this.queue.indexOf(queuePromise), 1)
-        let success
+        const success = this.setListener(key, newValue, storage)
         this.respond(event.detail?.resolve, 'storage-data', {
           key,
-          value: (success = this.setListener(key, newValue, storage))
+          value: success
             ? newValue
             : oldValue,
           command: 'merge',
           message: success
             ? 'Success!'
             : 'Not undone!',
-          error: success
-            ? false
-            : true
+          error: !success
         })
       } catch (error) {
-        return this.respond(event.detail?.resolve, undefined, {key, value: this.getListener(key, storage), message: `Error at mergeItem, most likely error at JSON.stringify: ${error}`, error: true}) || false
+        return this.respond(event.detail?.resolve, undefined, { key, value: this.getListener(key, storage), message: `Error at mergeItem, most likely error at JSON.stringify: ${error}`, error: true }) || false
       }
       return true
     }
-    
+
     /**
      * Listens to the event name/typeArg: 'get'
      *
@@ -117,9 +115,9 @@ export default class Storage extends WebWorker() {
       const key = typeof event === 'string'
         ? event
         : event.detail.key
-      if (!key.trim()) return this.respond(event.detail?.resolve, undefined, {key: null, value: null, message: 'Key is missing!', error: true}) || value
+      if (!key.trim()) return this.respond(event.detail?.resolve, undefined, { key: null, value: null, message: 'Key is missing!', error: true }) || value
       try {
-        const found = this.getStorage(storage).hasOwnProperty(key)
+        const found = this.getStorage(storage).hasOwnProperty(key) // eslint-disable-line
         this.respond(event.detail?.resolve, 'storage-data', {
           key,
           value: (value = JSON.parse(this.getStorage(storage).getItem(key) || '{}')),
@@ -127,12 +125,10 @@ export default class Storage extends WebWorker() {
           message: found
             ? 'Success!'
             : 'Item not found!',
-          error: found
-            ? false
-            : true
+          error: !found
         })
       } catch (error) {
-        this.respond(event.detail?.resolve, undefined, {key, value: null, message: `Error at getItem, most likely error at JSON.parse: ${error}`, error: true})
+        this.respond(event.detail?.resolve, undefined, { key, value: null, message: `Error at getItem, most likely error at JSON.parse: ${error}`, error: true })
       }
       return value
     }
@@ -149,7 +145,7 @@ export default class Storage extends WebWorker() {
       const key = typeof event === 'string'
         ? event
         : event.detail.key
-      if (!key.trim()) return this.respond(event.detail?.resolve, undefined, {key: null, value: null, message: 'Key is missing!', error: true})
+      if (!key.trim()) return this.respond(event.detail?.resolve, undefined, { key: null, value: null, message: 'Key is missing!', error: true })
       try {
         this.oldStorage.set(key, this.getListener(key, storage))
         this.getStorage(storage).removeItem(key)
@@ -161,7 +157,7 @@ export default class Storage extends WebWorker() {
           error: false
         })
       } catch (error) {
-        this.respond(event.detail?.resolve, undefined, {key: key, value: null, message: `Error at removeItem: ${error}`, error: true})
+        this.respond(event.detail?.resolve, undefined, { key, value: null, message: `Error at removeItem: ${error}`, error: true })
       }
     }
 
@@ -172,37 +168,35 @@ export default class Storage extends WebWorker() {
      * @return {void}
      */
     this.undoListener = event => {
-      if (!event.detail.key.trim()) return this.respond(event.detail.resolve, undefined, {key: null, value: null, message: 'Key is missing!', error: true})
+      if (!event.detail.key.trim()) return this.respond(event.detail.resolve, undefined, { key: null, value: null, message: 'Key is missing!', error: true })
       const oldValue = this.oldStorage.get(event.detail.key)
       if (oldValue) {
         try {
           const actualValue = this.getListener(event.detail.key, event.detail?.storageType)
           this.removeListener(event.detail.key, event.detail.storage)
-          let success
+          const success = this.setListener(event.detail.key, oldValue, event.detail.storage)
           this.respond(event.detail.resolve, 'storage-data', {
             key: event.detail.key,
-            value: (success = this.setListener(event.detail.key, oldValue, event.detail.storage))
+            value: success
               ? oldValue
               : this.getListener(event.detail.key, event.detail.storageType),
             command: 'undo',
             message: success
               ? 'Success!'
               : 'Not undone!',
-            error: success
-              ? false
-              : true
+            error: !success
           })
           this.oldStorage.set(event.detail.key, actualValue)
         } catch (error) {
-          this.respond(event.detail.resolve, undefined, {key: event.detail.key, value: this.getListener(event.detail.key, event.detail.storageType), message: `Error at undo: ${error}`, error: true})
+          this.respond(event.detail.resolve, undefined, { key: event.detail.key, value: this.getListener(event.detail.key, event.detail.storageType), message: `Error at undo: ${error}`, error: true })
         }
       } else {
-        this.respond(event.detail.resolve, undefined, {key: event.detail.key, value: this.getListener(event.detail.key, event.detail.storageType), message: 'No old value to undo!', error: true})
+        this.respond(event.detail.resolve, undefined, { key: event.detail.key, value: this.getListener(event.detail.key, event.detail.storageType), message: 'No old value to undo!', error: true })
       }
     }
 
     this.deepMergeListener = async event => {
-      this.respond(event.detail.resolve, undefined, {value: await this.webWorker(Storage.deepMerge, event.detail.target, event.detail.source, event.detail.concat, event.detail.maxLength, event.detail.uniqueArray)})
+      this.respond(event.detail.resolve, undefined, { value: await this.webWorker(Storage.deepMerge, event.detail.target, event.detail.source, event.detail.concat, event.detail.maxLength, event.detail.uniqueArray) })
     }
   }
 
@@ -234,12 +228,14 @@ export default class Storage extends WebWorker() {
    */
   respond (resolve, name, detail) {
     if (typeof resolve === 'function') return resolve(detail)
-    if (typeof name === 'string') this.dispatchEvent(new CustomEvent(name, {
-      detail,
-      bubbles: true,
-      cancelable: true,
-      composed: true
-    }))
+    if (typeof name === 'string') {
+      this.dispatchEvent(new CustomEvent(name, {
+        detail,
+        bubbles: true,
+        cancelable: true,
+        composed: true
+      }))
+    }
   }
 
   /**
@@ -256,7 +252,7 @@ export default class Storage extends WebWorker() {
    * source Object merge with target Array sets the position of target Array number as key in Object
    * source Array merge with target Object takes the Object keys and pushes them in order to the array (makes it backwards compatible with source Object merge with target Array)
    * concat for Arrays insert all values from target
-   * 
+   *
    * @static
    * @param {any} target
    * @param {any} source
@@ -265,7 +261,7 @@ export default class Storage extends WebWorker() {
    * @param {boolean} [uniqueArray = false]
    * @return {any}
    */
-  static deepMerge(target, source, concat = true, maxLength = false, uniqueArray = false) {
+  static deepMerge (target, source, concat = true, maxLength = false, uniqueArray = false) {
     if (typeof target !== 'object' || typeof source !== 'object') return structuredClone(source === undefined ? target : source)
     let result
     if (Array.isArray(source)) {
