@@ -17,7 +17,6 @@ const STORAGE_TYPE = {
 
 /**
  * As a controller, this component becomes a storage manager and organizes events
- * TODO: in progress!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
  *
  * @export
  * @class Storage
