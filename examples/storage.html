@@ -11,7 +11,7 @@
     <div class="set">
       <h2>Set storage-example "hello"</h2>
       <code class="code">
-        <pre>
+        <textarea>
           {
             "hello": {
               "places": ["world", "galaxy", "universe"],
@@ -20,40 +20,24 @@
               }
             }
           }
-        </pre>
+        </textarea>
       </code>
-      <code class="result">Result: <pre></pre></code>
-    </div>
-    <hr>
-    <!-- set -->
-    <div class="set">
-      <h2>Set other storage-example "goodBye"</h2>
-      <code class="code">
-        <pre>
-          {
-            "goodBye": {
-              "places": ["home", "couch", "whirlpool"],
-              "objects": {
-                "planets": {"first": "center"}
-              }
-            }
-          }
-        </pre>
-      </code>
+      <button>set</button>
       <code class="result">Result: <pre></pre></code>
     </div>
     <hr>
     <!-- get -->
     <div class="get">
       <h2>Get storage-example</h2>
+      <button>get</button>
       <code class="result">Result: <pre></pre></code>
     </div>
     <hr>
     <!-- merge -->
     <div class="merge">
-      <h2>Merge storage-example "hello" (uniqueArray, uniqueMap)</h2>
+      <h2>Merge storage-example (uniqueArray, uniqueMap)</h2>
       <code class="code">
-        <pre>
+        <textarea>
           {
             "hello": {
               "places": ["home", "couch", "whirlpool"],
@@ -62,38 +46,42 @@
               }
             }
           }
-        </pre>
+        </textarea>
       </code>
+      <button>merge</button>
       <code class="result">Result: <pre></pre></code>
     </div>
     <hr>
     <!-- merge -->
     <div class="merge">
-      <h2>Merge other storage-example "goodBye"</h2>
+      <h2>Merge other storage-example</h2>
       <code class="code">
-        <pre>
+        <textarea>
           {
-            "goodBye": {
-              "places": ["world", "galaxy", "universe"],
+            "hello": {
+              "places": ["home", "couch", "whirlpool"],
               "objects": {
-                "planets": {"fifth": "jupiter"}
+                "planets": {"first": "center"}
               }
             }
           }
-        </pre>
+        </textarea>
       </code>
+      <button>merge</button>
       <code class="result">Result: <pre></pre></code>
     </div>
     <hr>
     <!-- remove -->
     <div class="remove">
       <h2>Remove storage-example</h2>
+      <button>remove</button>
       <code class="result">Result: <pre></pre></code>
     </div>
     <hr>
     <!-- undo -->
     <div class="undo">
       <h2>Undo storage-example</h2>
+      <button>undo</button>
       <code class="result">Result: <pre></pre></code>
     </div>
   </c-storage>
@@ -101,18 +89,34 @@
     .get, .set, .merge, .remove, .undo {
       cursor: pointer;
     }
-    code {
+    code, button {
       display: block;
       background-color: black;
       color: green;
       padding: 1em;
       word-break: break-all;
     }
-    code > pre {
+    code > pre, code > textarea {
       white-space: break-spaces;
     }
     code.code {
       margin-bottom: 1em;
+    }
+    code > textarea {
+      height: 20em;
+      width: 100%;
+    }
+    button {
+      border: 2px solid green;
+      border-radius: 50%;
+      cursor: pointer;
+      margin-bottom: 1em;
+    }
+    h2 {
+      text-decoration: underline;
+    }
+    div > *:not(h2) {
+      margin-left: 2em;
     }
   </style>
   <script rel=preload type=module>
@@ -122,13 +126,15 @@
       // don't define already existing customElements
       if (element && !customElements.get(element[0])) customElements.define(...element)
     }))
+    // prevent textarea to send click event
+    document.body.querySelectorAll('textarea').forEach(el => el.addEventListener('click', event => event.stopPropagation()))
     // set
     const setEls = document.body.querySelectorAll('.set')
     setEls.forEach(el => el.addEventListener('click', event => new Promise(resolve => el.dispatchEvent(new CustomEvent('storage-set', {
       detail: {
         key: 'storage-example',
         resolve,
-        value: JSON.parse(el.querySelector('code.code').textContent)
+        value: JSON.parse(el.querySelector('code.code > textarea').value)
       },
       bubbles: true,
       cancelable: true,
@@ -154,7 +160,7 @@
         resolve,
         uniqueArray: i === 0,
         uniqueMap: i === 0,
-        value: JSON.parse(el.querySelector('code.code').textContent)
+        value: JSON.parse(el.querySelector('code.code > textarea').value)
       },
       bubbles: true,
       cancelable: true,
