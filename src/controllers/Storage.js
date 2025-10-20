@@ -30,7 +30,7 @@ export default class Storage extends WebWorker() {
     /**
      * Listens to the event name/typeArg: 'set'
      *
-     * @param {CustomEvent & {detail: { key: string, value: any, storageType?: 'localStorage' }} | string | any} event
+     * @param {CustomEvent & {detail: { key: string, value: any, storageType?: 'localStorage', resolve: Promise<{ key: string, value: any, message: string, error: boolean }> }} | any} event
      * @param {any} [value=undefined]
      * @param {Storage} [storage=undefined]
      * @return {boolean}
@@ -58,7 +58,7 @@ export default class Storage extends WebWorker() {
     /**
     * Listens to the event name/typeArg: 'merge'
     *
-    * @param {CustomEvent & {detail: { key: string, value: any, storageType?: 'localStorage', concat?: boolean }} | string | any} event
+    * @param {CustomEvent & {detail: { key: string, value: any, storageType?: 'localStorage', resolve: Promise<{ key: string, value: any, message: string, error: boolean }>, concat?: boolean|'unshift', maxLength: number, uniqueArray: boolean, uniqueMap: boolean }} | any} event
     * @param {any} [value=undefined]
     * @param {Storage} [storage=undefined]
     * @return {Promise<boolean>}
@@ -104,7 +104,7 @@ export default class Storage extends WebWorker() {
     /**
      * Listens to the event name/typeArg: 'get'
      *
-     * @param {CustomEvent & {detail: {key: string, storageType?: 'localStorage'}} | string | any} event
+     * @param {CustomEvent & {detail: {key: string, storageType?: 'localStorage', resolve: Promise<{ key: string, value: any, message: string, error: boolean }>}} | any} event
      * @param {Storage} [storage=undefined]
      * @return {any}
      */
@@ -135,7 +135,7 @@ export default class Storage extends WebWorker() {
     /**
      * Listens to the event name/typeArg: 'remove'
      *
-     * @param {CustomEvent & {detail: {key: string, storageType?: 'localStorage'}} | string | any} event
+     * @param {CustomEvent & {detail: {key: string, storageType?: 'localStorage', resolve: Promise<{ key: string, value: any, message: string, error: boolean }>}} | any} event
      * @param {Storage} [storage=undefined]
      * @return {void}
      */
@@ -163,7 +163,7 @@ export default class Storage extends WebWorker() {
     /**
      * Listens to the event name/typeArg: 'undo'
      *
-     * @param {CustomEvent & {detail: {key: string, storageType?: 'localStorage'}} | any} event
+     * @param {CustomEvent & {detail: {key: string, storageType?: 'localStorage', resolve: Promise<{ key: string, value: any, message: string, error: boolean }>}} | any} event
      * @return {void}
      */
     this.undoListener = event => {
@@ -194,6 +194,12 @@ export default class Storage extends WebWorker() {
       }
     }
 
+    /**
+    * Listens to the event name/typeArg: 'storage-deep-merge' and does not merge and save to storage analog this.mergeListener but simply returns the result of deepMerge
+    *
+    * @param {CustomEvent & {detail: { target: any, source: any, resolve: Promise<{ key: string, value: any, message: string, error: boolean }>, concat?: boolean|'unshift', maxLength: number, uniqueArray: boolean, uniqueMap: boolean }} | any} event
+    * @return {Promise<void>}
+    */
     this.deepMergeListener = async event => {
       this.respond(event.detail.resolve, undefined, { value: await this.webWorker(Storage.deepMerge, event.detail.target, event.detail.source, event.detail.concat, event.detail.maxLength, event.detail.uniqueArray, event.detail.uniqueMap) })
     }

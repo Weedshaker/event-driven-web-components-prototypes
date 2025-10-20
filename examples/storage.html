@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <title>Storage Example</title>
+</head>
+<body>
+  <c-storage>
+    <!-- set -->
+    <div class="set">
+      <h2>Set storage-example "hello"</h2>
+      <code class="code">
+        <pre>
+          {
+            "hello": {
+              "places": ["world", "galaxy", "universe"],
+              "objects": {
+                "planets": {"fifth": "jupiter"}
+              }
+            }
+          }
+        </pre>
+      </code>
+      <code class="result">Result: <pre></pre></code>
+    </div>
+    <hr>
+    <!-- set -->
+    <div class="set">
+      <h2>Set other storage-example "goodBye"</h2>
+      <code class="code">
+        <pre>
+          {
+            "goodBye": {
+              "places": ["home", "couch", "whirlpool"],
+              "objects": {
+                "planets": {"first": "center"}
+              }
+            }
+          }
+        </pre>
+      </code>
+      <code class="result">Result: <pre></pre></code>
+    </div>
+    <hr>
+    <!-- get -->
+    <div class="get">
+      <h2>Get storage-example</h2>
+      <code class="result">Result: <pre></pre></code>
+    </div>
+    <hr>
+    <!-- merge -->
+    <div class="merge">
+      <h2>Merge storage-example "hello" (uniqueArray, uniqueMap)</h2>
+      <code class="code">
+        <pre>
+          {
+            "hello": {
+              "places": ["home", "couch", "whirlpool"],
+              "objects": {
+                "planets": {"first": "center"}
+              }
+            }
+          }
+        </pre>
+      </code>
+      <code class="result">Result: <pre></pre></code>
+    </div>
+    <hr>
+    <!-- merge -->
+    <div class="merge">
+      <h2>Merge other storage-example "goodBye"</h2>
+      <code class="code">
+        <pre>
+          {
+            "goodBye": {
+              "places": ["world", "galaxy", "universe"],
+              "objects": {
+                "planets": {"fifth": "jupiter"}
+              }
+            }
+          }
+        </pre>
+      </code>
+      <code class="result">Result: <pre></pre></code>
+    </div>
+    <hr>
+    <!-- remove -->
+    <div class="remove">
+      <h2>Remove storage-example</h2>
+      <code class="result">Result: <pre></pre></code>
+    </div>
+    <hr>
+    <!-- undo -->
+    <div class="undo">
+      <h2>Undo storage-example</h2>
+      <code class="result">Result: <pre></pre></code>
+    </div>
+  </c-storage>
+  <style>
+    .get, .set, .merge, .remove, .undo {
+      cursor: pointer;
+    }
+    code {
+      display: block;
+      background-color: black;
+      color: green;
+      padding: 1em;
+      word-break: break-all;
+    }
+    code > pre {
+      white-space: break-spaces;
+    }
+    code.code {
+      margin-bottom: 1em;
+    }
+  </style>
+  <script rel=preload type=module>
+    Promise.all([
+      import('../src/controllers/Storage.js').then(module => ['c-storage', module.default]),
+    ]).then(elements => elements.forEach(element => {
+      // don't define already existing customElements
+      if (element && !customElements.get(element[0])) customElements.define(...element)
+    }))
+    // set
+    const setEls = document.body.querySelectorAll('.set')
+    setEls.forEach(el => el.addEventListener('click', event => new Promise(resolve => el.dispatchEvent(new CustomEvent('storage-set', {
+      detail: {
+        key: 'storage-example',
+        resolve,
+        value: JSON.parse(el.querySelector('code.code').textContent)
+      },
+      bubbles: true,
+      cancelable: true,
+      composed: true
+    }))).then(result => (el.querySelector('code.result > pre').textContent = JSON.stringify(result, undefined, 2)))))
+    // get
+    const getEls = document.body.querySelectorAll('.get')
+    getEls.forEach(el => el.addEventListener('click', event => new Promise(resolve => el.dispatchEvent(new CustomEvent('storage-get', {
+      detail: {
+        key: 'storage-example',
+        resolve
+      },
+      bubbles: true,
+      cancelable: true,
+      composed: true
+    }))).then(result => (el.querySelector('code.result > pre').textContent = JSON.stringify(result, undefined, 2)))))
+    // merge
+    const mergeEls = document.body.querySelectorAll('.merge')
+    mergeEls.forEach((el, i) => el.addEventListener('click', event => new Promise(resolve => el.dispatchEvent(new CustomEvent('storage-merge', {
+      detail: {
+        concat: true,
+        key: 'storage-example',
+        resolve,
+        uniqueArray: i === 0,
+        uniqueMap: i === 0,
+        value: JSON.parse(el.querySelector('code.code').textContent)
+      },
+      bubbles: true,
+      cancelable: true,
+      composed: true
+    }))).then(result => (el.querySelector('code.result > pre').textContent = JSON.stringify(result, undefined, 2)))))
+    // remove
+    const removeEls = document.body.querySelectorAll('.remove')
+    removeEls.forEach((el, i) => el.addEventListener('click', event => new Promise(resolve => el.dispatchEvent(new CustomEvent('storage-remove', {
+      detail: {
+        key: 'storage-example',
+        resolve
+      },
+      bubbles: true,
+      cancelable: true,
+      composed: true
+    }))).then(result => (el.querySelector('code.result > pre').textContent = JSON.stringify(result, undefined, 2)))))
+    // undo
+    const undoEls = document.body.querySelectorAll('.undo')
+    undoEls.forEach((el, i) => el.addEventListener('click', event => new Promise(resolve => el.dispatchEvent(new CustomEvent('storage-undo', {
+      detail: {
+        key: 'storage-example',
+        resolve
+      },
+      bubbles: true,
+      cancelable: true,
+      composed: true
+    }))).then(result => (el.querySelector('code.result > pre').textContent = JSON.stringify(result, undefined, 2)))))
+  </script>
+</body>
+</html>
