@@ -2,6 +2,10 @@
 
 import { WebWorker } from '../WebWorker.js'
 
+/** @typedef {{ cryptoKey: CryptoKey, jsonWebKey?: JsonWebKey, epoch: string }} KEY */
+/** @typedef {{ text: string, iv: Uint8Array<ArrayBuffer>, name: string, epoch: string, keyEpoch: string }} ENCRYPTED */
+/** @typedef {{ text: string, epoch: string, keyEpoch: string, encrypted: { epoch: string, keyEpoch: string } }} DECRYPTED */
+
 /**
  * As a controller, this component becomes a crypto manager and organizes events
  * Inspired by: https://github.com/mdn/dom-examples/blob/main/web-crypto/derive-key/ecdh.js + https://getstream.io/blog/web-crypto-api-chat/
@@ -10,11 +14,75 @@ import { WebWorker } from '../WebWorker.js'
  * @class Crypto
  */
 export default class Crypto extends WebWorker() {
-  /** @type {'jwk'} */
-  #format = 'jwk'
-  // IV should be 96 bits long [96 bits / 8 = 12 bytes] and unique for each encryption (https://developer.mozilla.org/en-US/docs/Web/API/AesGcmParams#iv)
-  // TODO: Make it unique for each encryption and decryption. Can be publicly shared with encrypted message in plain.
-  #iv = self.crypto.getRandomValues(new Uint8Array(12))
+  static #keysCache = {
+    /**
+     * caching the cryptoKeys by jsonWebKey as map-key
+     *
+     * @type {Map<string, CryptoKey>}
+     */
+    cryptoKeysCache: new Map(),
+    /**
+     * caching the jsonWebKey by cryptoKey as map-key
+     *
+     * @type {WeakMap<CryptoKey, JsonWebKey>}
+     */
+    jsonWebKeysCache: new WeakMap(),
+    /**
+     * getKeysCache
+     * 
+     * @returns {(key: CryptoKey | JsonWebKey | string) => CryptoKey | JsonWebKey | undefined}
+     */
+    get get() {
+      return key => {
+        if (key instanceof CryptoKey) {
+          return this.jsonWebKeysCache.get(key)
+        }
+        return this.cryptoKeysCache.get(typeof key === 'string'
+          ? key
+          : JSON.stringify(key)
+        )
+      }
+    },
+    /**
+     * hasKeysCache
+     * 
+     * @returns {(key: CryptoKey | JsonWebKey | string) => boolean}
+     */
+    get has() {
+      return key => {
+        if (key instanceof CryptoKey) {
+          return this.jsonWebKeysCache.has(key)
+        }
+        return this.cryptoKeysCache.has(typeof key === 'string'
+          ? key
+          : JSON.stringify(key)
+        )
+      }
+    },
+    /**
+     * setKeysCache
+     * 
+     * @returns {(jsonWebKey: JsonWebKey | string, cryptoKey: CryptoKey) => void}
+     */
+    get set() {
+      return (jsonWebKey, cryptoKey) => {
+          // @ts-ignore
+        this.cryptoKeysCache.set(
+          typeof jsonWebKey === 'string'
+            ? jsonWebKey
+            : JSON.stringify(jsonWebKey),
+          cryptoKey
+        )
+        // @ts-ignore
+        this.jsonWebKeysCache.set(
+          cryptoKey, 
+          typeof jsonWebKey === 'string'
+            ? JSON.parse(jsonWebKey)
+            : jsonWebKey
+        )
+      }
+    }
+  }
 
   constructor () {
     super()
@@ -23,26 +91,23 @@ export default class Crypto extends WebWorker() {
   }
 
   async startExample () {
-    this.bobsAsyncKeyPairJwk = await this.#getAsyncKeyPairJwk()
-    this.alicesAsyncKeyPairJwk = await this.#getAsyncKeyPairJwk()
-  
-    this.bobsWithAlicesAsyncKey = await this.getAsyncKey(this.bobsAsyncKeyPairJwk.privateKeyJwk, this.alicesAsyncKeyPairJwk.publicKeyJwk)
-    this.alicesWithBobsAsyncKey = await this.getAsyncKey(this.alicesAsyncKeyPairJwk.privateKeyJwk, this.bobsAsyncKeyPairJwk.publicKeyJwk)
+    this.bobsAsyncKeyPair = await this.generateAsyncKeyPair()
+    this.alicesAsyncKeyPair = await this.generateAsyncKeyPair()
 
-    console.log('*********', this.bobsAsyncKeyPairJwk, this.alicesAsyncKeyPairJwk)
-    let encryptedText
-    console.log('encrypted: ', '"hello alice" to: ', (encryptedText = await this.encrypt('hello alice', this.bobsWithAlicesAsyncKey)))
-    console.log('decrypted: ', `${encryptedText} to: `, await this.decrypt(encryptedText, this.alicesWithBobsAsyncKey))
-    console.log('----------------------------')
-    console.log('encrypted: ', '"hello bob" to: ', (encryptedText = await this.encrypt('hello bob', this.alicesWithBobsAsyncKey)))
-    console.log('decrypted: ', `${encryptedText} to: `, await this.decrypt(encryptedText, this.bobsWithAlicesAsyncKey))
-    console.log('----------------------------')
+    this.bobToAliceAsyncKey = await this.deriveSyncKeyFromAsyncKeyPair(this.bobsAsyncKeyPair.privateKey.cryptoKey, this.alicesAsyncKeyPair.publicKey.cryptoKey)
+    this.aliceToBobAsyncKey = await this.deriveSyncKeyFromAsyncKeyPair(this.alicesAsyncKeyPair.privateKey.cryptoKey, this.bobsAsyncKeyPair.publicKey.cryptoKey)
 
-    this.rudisSyncKeyJwk = await this.#getSyncKeyJwk()
-    console.log('*********', this.rudisSyncKeyJwk)
-    this.rudisSyncKey = await this.getSyncKey(this.rudisSyncKeyJwk)
-    console.log('encrypted: ', '"I am Rudi" to: ', (encryptedText = await this.encrypt('I am Rudi', this.rudisSyncKey)))
-    console.log('decrypted: ', `${encryptedText} to: `, await this.decrypt(encryptedText, this.rudisSyncKey))
+    const encryptedBobToAlice = await this.encrypt('Hello Alice', this.bobToAliceAsyncKey)
+    const encryptedAliceToBob = await this.encrypt('Hello Bob', this.aliceToBobAsyncKey)
+
+    const decryptedBobToAlice = await this.decrypt(encryptedBobToAlice, this.aliceToBobAsyncKey)
+    const decryptedAliceToBob = await this.decrypt(encryptedAliceToBob, this.bobToAliceAsyncKey)
+
+    console.log('*********', {encryptedBobToAlice, encryptedAliceToBob, decryptedBobToAlice, decryptedAliceToBob})
+
+    // TODO: Example of the jwk functions
+    // TODO: EventDriven analog Storage.js
+    // TODO: UI for examples
   }
 
   connectedCallback () {
@@ -53,46 +118,58 @@ export default class Crypto extends WebWorker() {
     
   }
 
-  // synchronous key
-  async #getSyncKeyJwk () {
-    return await self.crypto.subtle.exportKey(
-      this.#format,
-      await self.crypto.subtle.generateKey(
+  /**
+   * get new synchronous key
+   * 
+   * @async
+   * @returns {Promise<KEY>}
+   */
+  async generateSyncKey () {
+    return this.webWorker(Crypto.#_generateSyncKey, Crypto.#epochDateNow)
+  }
+
+  /**
+   * get new synchronous key
+   * 
+   * @async
+   * @static
+   * @param {string} epoch
+   * @returns {Promise<KEY>}
+   */
+  static async #_generateSyncKey (epoch) {
+    return {
+      cryptoKey: await self.crypto.subtle.generateKey(
         {
           name: 'AES-GCM',
           length: 256
         },
         true,
         ['encrypt', 'decrypt']
-      )
-    )
+      ),
+      epoch
+    }
   }
 
   /**
-   * getSyncKey
-   * typically the 
+   * get new asynchronous key pair
    * 
-   * @param {JsonWebKey} keyJwk
-   * @returns {Promise<CryptoKey>}
+   * @async
+   * @returns {Promise<{ publicKey: KEY, privateKey: KEY }>}
    */
-  async getSyncKey (keyJwk) {
-    // Note: That self.crypto.subtle.deriveKey returns the same CryptoKey when same Jwks were used
-    return await self.crypto.subtle.importKey(
-          // @ts-ignore
-          this.#format,
-          keyJwk,
-          {
-            name: keyJwk.kty === 'oct' ? 'AES-GCM' : keyJwk.kty || 'AES-GCM',
-            length: 256
-          },
-          true,
-          keyJwk.key_ops || []
-        )
+  async generateAsyncKeyPair () {
+    return this.webWorker(Crypto.#_generateAsyncKeyPair, Crypto.#epochDateNow)
   }
 
-  // asynchronous key pair
-  async #getAsyncKeyPairJwk () {
-    const keyPair = await self.crypto.subtle.generateKey(
+  /**
+   * get new asynchronous key pair
+   * 
+   * @async
+   * @static
+   * @param {string} epoch
+   * @returns {Promise<{ publicKey: KEY, privateKey: KEY }>}
+   */
+  static async #_generateAsyncKeyPair (epoch) {
+    const {publicKey, privateKey} = await self.crypto.subtle.generateKey(
       {
         name: 'ECDH',
         namedCurve: 'P-256',
@@ -101,92 +178,251 @@ export default class Crypto extends WebWorker() {
       ['deriveKey', 'deriveBits']
     )
     return {
-      publicKeyJwk: await self.crypto.subtle.exportKey(
-        this.#format,
-        keyPair.publicKey
-      ),
-      privateKeyJwk: await self.crypto.subtle.exportKey(
-        this.#format,
-        keyPair.privateKey
-      )
+      publicKey: {
+        cryptoKey: publicKey,
+        epoch
+      },
+      privateKey: {
+        cryptoKey: privateKey,
+        epoch
+      }
     }
   }
 
   /**
-   * getAsyncKey
-   * typically created with own privateKeyJwk and foreign publicKeyJwk
+   * deriveSyncKeyFromAsyncKeyPair
+   * typically created with own privateKey and foreign publicKey
    * 
-   * @param {JsonWebKey} privateKeyJwk
-   * @param {JsonWebKey} publicKeyJwk
-   * @param {KeyUsage[]} keyUsages?
-   * @returns {Promise<CryptoKey>}
+   * @async
+   * @param {CryptoKey} privateKey
+   * @param {CryptoKey} publicKey
+   * @param {KeyUsage[]} [keyUsages=['encrypt', 'decrypt']]
+   * @returns {Promise<KEY>}
    */
-  async getAsyncKey (privateKeyJwk, publicKeyJwk, keyUsages = ['encrypt', 'decrypt']) {
-    // Note: That self.crypto.subtle.deriveKey returns the same CryptoKey when same Jwks were used
-    return await self.crypto.subtle.deriveKey(
-      { 
-        name: 'ECDH',
-        public: await self.crypto.subtle.importKey(
-          // @ts-ignore
-          this.#format,
-          publicKeyJwk,
-          {
-            name: publicKeyJwk.kty === 'EC' ? 'ECDH' : publicKeyJwk.kty || 'ECDH',
-            namedCurve: publicKeyJwk.crv || 'P-256',
-          },
-          true,
-          publicKeyJwk.key_ops || []
-        )
-      },
-      await self.crypto.subtle.importKey(
-        // @ts-ignore
-        this.#format,
-        privateKeyJwk,
+  async deriveSyncKeyFromAsyncKeyPair (privateKey, publicKey, keyUsages = ['encrypt', 'decrypt']) {
+    return this.webWorker(Crypto.#_deriveSyncKeyFromAsyncKeyPair, privateKey, publicKey, keyUsages, Crypto.#epochDateNow)
+  }
+
+  /**
+   * deriveSyncKeyFromAsyncKeyPair
+   * typically created with own privateKey and foreign publicKey
+   * 
+   * @async
+   * @static
+   * @param {CryptoKey} privateKey
+   * @param {CryptoKey} publicKey
+   * @param {KeyUsage[]} keyUsages
+   * @param {string} epoch
+   * @returns {Promise<KEY>}
+   */
+  static async #_deriveSyncKeyFromAsyncKeyPair (privateKey, publicKey, keyUsages, epoch) {
+    return {
+      cryptoKey: await self.crypto.subtle.deriveKey(
+        { 
+          name: 'ECDH',
+          public: publicKey
+        },
+        privateKey,
         {
-          name: privateKeyJwk.kty === 'EC' ? 'ECDH' : privateKeyJwk.kty || 'ECDH',
-          namedCurve: privateKeyJwk.crv || 'P-256',
+          name: 'AES-GCM',
+          length: 256
         },
         true,
-        privateKeyJwk.key_ops || ['deriveKey', 'deriveBits']
+        keyUsages
       ),
-      {
-        name: 'AES-GCM',
-        length: 256
-      },
+      epoch
+    }
+  }
+
+  /**
+   * encrypt
+   * 
+   * @async
+   * @param {string} text
+   * @param {KEY} key
+   * @returns {Promise<ENCRYPTED>}
+   */
+  async encrypt (text, key) {
+    return this.webWorker(Crypto.#_encrypt, text, key, Crypto.#epochDateNow)
+  }
+
+  /**
+   * encrypt
+   * 
+   * @async
+   * @static
+   * @param {string} text
+   * @param {KEY} key
+   * @param {string} epoch
+   * @returns {Promise<ENCRYPTED>}
+   */
+  static async #_encrypt (text, key, epoch) {
+    const name = 'AES-GCM'
+    // IV should be 96 bits long [96 bits / 8 = 12 bytes] and unique for each encryption (https://developer.mozilla.org/en-US/docs/Web/API/AesGcmParams#iv)
+    const iv = self.crypto.getRandomValues(new Uint8Array(12))
+    return {
+      text: btoa(String.fromCharCode(...new Uint8Array(await self.crypto.subtle.encrypt(
+        {
+          name,
+          iv
+        },
+        key.cryptoKey,
+        new TextEncoder().encode(text)
+      )))),
+      iv,
+      name,
+      epoch,
+      keyEpoch: key.epoch
+    }
+  }
+
+  /**
+   * decrypt
+   * 
+   * @async
+   * @param {ENCRYPTED} encrypted
+   * @param {KEY} key
+   * @returns {Promise<DECRYPTED|{ error: true, message: string, encrypted: ENCRYPTED, key: KEY }>}
+   */
+  async decrypt (encrypted, key) {
+    return this.webWorker(Crypto.#_decrypt, encrypted, key, Crypto.#epochDateNow)
+  }
+
+  /**
+   * decrypt
+   * 
+   * @async
+   * @static
+   * @param {ENCRYPTED} encrypted
+   * @param {KEY} key
+   * @param {string} epoch
+   * @returns {Promise<DECRYPTED|{ error: true, message: string, encrypted: ENCRYPTED, key: KEY }>}
+   */
+  static async #_decrypt (encrypted, key, epoch) {
+    try {
+      return {
+        text: new TextDecoder().decode(await self.crypto.subtle.decrypt(
+          {
+            name: encrypted.name,
+            iv: encrypted.iv
+          },
+          key.cryptoKey,
+          Uint8Array.from(atob(encrypted.text), char => char.charCodeAt(0))
+        )),
+        epoch,
+        keyEpoch: key.epoch,
+        encrypted: {
+          epoch: encrypted.epoch,
+          keyEpoch: encrypted.keyEpoch
+        }
+      }
+    } catch (error) {
+      return {
+        error: true,
+        message: `error decrypting encrypted: ${error}`,
+        encrypted,
+        key
+      }
+    }
+  }
+
+  /**
+   * jsonWebKeyToCryptoKey
+   * 
+   * @async
+   * @param {JsonWebKey | string} jsonWebKey
+   * @param {AlgorithmIdentifier | RsaHashedImportParams | EcKeyImportParams | HmacImportParams | AesKeyAlgorithm | null} [algorithm=null]
+   * @param {ReadonlyArray<KeyUsage> | null} [keyUsages=null]
+   * @param {'jwk'} [format='jwk']
+   * @returns {Promise<CryptoKey>}
+   */
+  async jsonWebKeyToCryptoKey (jsonWebKey, algorithm = null, keyUsages = null, format = 'jwk') {
+    // @ts-ignore
+    if (Crypto.#keysCache.has(jsonWebKey)) return Crypto.#keysCache.get(jsonWebKey)
+    const cryptoKey = await this.webWorker(Crypto.#_jsonWebKeyToCryptoKey, jsonWebKey, algorithm, keyUsages, format)
+    Crypto.#keysCache.set(jsonWebKey, cryptoKey)
+    return cryptoKey
+  }
+
+  /**
+   * jsonWebKeyToCryptoKey
+   * 
+   * @async
+   * @static
+   * @param {JsonWebKey} jsonWebKey
+   * @param {AlgorithmIdentifier | RsaHashedImportParams | EcKeyImportParams | HmacImportParams | AesKeyAlgorithm | null} algorithm
+   * @param {ReadonlyArray<KeyUsage> | null} keyUsages
+   * @param {'jwk'} format
+   * @returns {Promise<CryptoKey>}
+   */
+  static async #_jsonWebKeyToCryptoKey (jsonWebKey, algorithm, keyUsages, format) {
+    if (typeof jsonWebKey === 'string') jsonWebKey = JSON.parse(jsonWebKey)
+    if (!algorithm) {
+      algorithm = {
+        name: jsonWebKey.kty === 'oct'
+          ? 'AES-GCM'
+          : jsonWebKey.kty === 'EC'
+            ? 'ECDH'
+            : jsonWebKey.kty || 'AES-GCM',
+      }
+      if (algorithm.name === 'AES-GCM') {
+        // @ts-ignore
+        algorithm.length = 256
+      } else {
+        // @ts-ignore
+        algorithm.namedCurve = jsonWebKey.crv || 'P-256'
+      }
+    }
+    return await self.crypto.subtle.importKey(
+      // @ts-ignore
+      format,
+      jsonWebKey,
+      algorithm,
       true,
       keyUsages
+        ? keyUsages
+        : jsonWebKey.key_ops || []
     )
   }
 
-  async encrypt (text, key, iv = this.#iv) {
-    return btoa(String.fromCharCode(...new Uint8Array(await self.crypto.subtle.encrypt(
-      {
-        name: 'AES-GCM',
-        iv
-      },
-      key,
-      new TextEncoder().encode(text)
-    ))))
-  }
-
-  async decrypt (text, key, iv = this.#iv) {
-    try {
-      return new TextDecoder().decode(await self.crypto.subtle.decrypt(
-        {
-          name: 'AES-GCM',
-          iv
-        },
-        key,
-        Uint8Array.from(atob(text), char => char.charCodeAt(0))
-      ))
-    } catch (error) {
-      return `error decrypting message: ${error}`
-    }
+  /**
+   * cryptoKeyToJsonWebKey
+   * 
+   * @async
+   * @param {CryptoKey} cryptoKey
+   * @param {'jwk'} [format='jwk']
+   * @returns {Promise<JsonWebKey>}
+   */
+  async cryptoKeyToJsonWebKey (cryptoKey, format = 'jwk') {
+    // @ts-ignore
+    if (Crypto.#keysCache.has(cryptoKey)) return Crypto.#keysCache.get(cryptoKey)
+    const jsonWebKey = await this.webWorker(Crypto.#_cryptoKeyToJsonWebKey, cryptoKey, format)
+    Crypto.#keysCache.set(jsonWebKey, cryptoKey)
+    return jsonWebKey
   }
 
   /**
-   *
-   *
+   * cryptoKeyToJsonWebKey
+   * 
+   * @async
+   * @static
+   * @param {CryptoKey} cryptoKey
+   * @param {'jwk'} format
+   * @returns {Promise<JsonWebKey>}
+   */
+  static async #_cryptoKeyToJsonWebKey (cryptoKey, format) {
+    return await self.crypto.subtle.exportKey(format, cryptoKey)
+  }
+
+  /**
+   * @static
+   * @return {string}
+   */
+  static get #epochDateNow () {
+    return JSON.stringify({ epoch: Date.now(), uuid: self.crypto.randomUUID() })
+  }
+
+  /**
    * @param {(any)=>void} resolve
    * @param {string|undefined} name
    * @param {any} detail

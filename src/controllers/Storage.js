@@ -224,8 +224,6 @@ export default class Storage extends WebWorker() {
   }
 
   /**
-   *
-   *
    * @param {(any)=>void} resolve
    * @param {string|undefined} name
    * @param {any} detail
