@@ -2,9 +2,11 @@
 
 import { WebWorker } from '../WebWorker.js'
 
-/** @typedef {{ cryptoKey: CryptoKey, jsonWebKey?: JsonWebKey, epoch: string, derived?: { privateKeyEpoch: string, publicKeyEpoch: string } }} KEY */
-/** @typedef {{ text: string, iv: Uint8Array<ArrayBuffer>, name: string, epoch: string, keyEpoch: string }} ENCRYPTED */
-/** @typedef {{ text: string, epoch: string, keyEpoch: string, encrypted: { epoch: string, keyEpoch: string } }} DECRYPTED */
+/** @typedef {{ privateKeyEpoch: string, publicKeyEpoch: string }} DERIVED */
+/** @typedef {{ epoch:string, derived?: DERIVED }} KEY_EPOCH */
+/** @typedef {{ cryptoKey: CryptoKey, jsonWebKey?: JsonWebKey, epoch: string, derived?: DERIVED }} KEY */
+/** @typedef {{ text: string, iv: Uint8Array<ArrayBuffer>, name: string, epoch: string, key: KEY_EPOCH }} ENCRYPTED */
+/** @typedef {{ text: string, epoch: string, encrypted: { epoch: string, key: KEY_EPOCH }, key: KEY_EPOCH }} DECRYPTED */
 
 /**
  * As a controller, this component becomes a crypto manager and organizes events
@@ -276,7 +278,10 @@ export default class Crypto extends WebWorker() {
       iv,
       name,
       epoch,
-      keyEpoch: key.epoch
+      key: {
+        epoch: key.epoch,
+        derived: key.derived
+      }
     }
   }
 
@@ -314,10 +319,13 @@ export default class Crypto extends WebWorker() {
           Uint8Array.from(atob(encrypted.text), char => char.charCodeAt(0))
         )),
         epoch,
-        keyEpoch: key.epoch,
         encrypted: {
           epoch: encrypted.epoch,
-          keyEpoch: encrypted.keyEpoch
+          key: encrypted.key
+        },
+        key: {
+          epoch: key.epoch,
+          derived: key.derived
         }
       }
     } catch (error) {
