@@ -2,7 +2,7 @@
 
 import { WebWorker } from '../WebWorker.js'
 
-/** @typedef {{ cryptoKey: CryptoKey, jsonWebKey?: JsonWebKey, epoch: string }} KEY */
+/** @typedef {{ cryptoKey: CryptoKey, jsonWebKey?: JsonWebKey, epoch: string, derived?: { privateKeyEpoch: string, publicKeyEpoch: string } }} KEY */
 /** @typedef {{ text: string, iv: Uint8Array<ArrayBuffer>, name: string, epoch: string, keyEpoch: string }} ENCRYPTED */
 /** @typedef {{ text: string, epoch: string, keyEpoch: string, encrypted: { epoch: string, keyEpoch: string } }} DECRYPTED */
 
@@ -94,8 +94,8 @@ export default class Crypto extends WebWorker() {
     this.bobsAsyncKeyPair = await this.generateAsyncKeyPair()
     this.alicesAsyncKeyPair = await this.generateAsyncKeyPair()
 
-    this.bobToAliceAsyncKey = await this.deriveSyncKeyFromAsyncKeyPair(this.bobsAsyncKeyPair.privateKey.cryptoKey, this.alicesAsyncKeyPair.publicKey.cryptoKey)
-    this.aliceToBobAsyncKey = await this.deriveSyncKeyFromAsyncKeyPair(this.alicesAsyncKeyPair.privateKey.cryptoKey, this.bobsAsyncKeyPair.publicKey.cryptoKey)
+    this.bobToAliceAsyncKey = await this.deriveSyncKeyFromAsyncKeyPair(this.bobsAsyncKeyPair.privateKey, this.alicesAsyncKeyPair.publicKey)
+    this.aliceToBobAsyncKey = await this.deriveSyncKeyFromAsyncKeyPair(this.alicesAsyncKeyPair.privateKey, this.bobsAsyncKeyPair.publicKey)
 
     const encryptedBobToAlice = await this.encrypt('Hello Alice', this.bobToAliceAsyncKey)
     const encryptedAliceToBob = await this.encrypt('Hello Bob', this.aliceToBobAsyncKey)
@@ -194,8 +194,8 @@ export default class Crypto extends WebWorker() {
    * typically created with own privateKey and foreign publicKey
    * 
    * @async
-   * @param {CryptoKey} privateKey
-   * @param {CryptoKey} publicKey
+   * @param {KEY} privateKey
+   * @param {KEY} publicKey
    * @param {KeyUsage[]} [keyUsages=['encrypt', 'decrypt']]
    * @returns {Promise<KEY>}
    */
@@ -209,8 +209,8 @@ export default class Crypto extends WebWorker() {
    * 
    * @async
    * @static
-   * @param {CryptoKey} privateKey
-   * @param {CryptoKey} publicKey
+   * @param {KEY} privateKey
+   * @param {KEY} publicKey
    * @param {KeyUsage[]} keyUsages
    * @param {string} epoch
    * @returns {Promise<KEY>}
@@ -220,9 +220,9 @@ export default class Crypto extends WebWorker() {
       cryptoKey: await self.crypto.subtle.deriveKey(
         { 
           name: 'ECDH',
-          public: publicKey
+          public: publicKey.cryptoKey
         },
-        privateKey,
+        privateKey.cryptoKey,
         {
           name: 'AES-GCM',
           length: 256
@@ -230,7 +230,11 @@ export default class Crypto extends WebWorker() {
         true,
         keyUsages
       ),
-      epoch
+      epoch,
+      derived: {
+        privateKeyEpoch: privateKey.epoch,
+        publicKeyEpoch: publicKey.epoch
+      }
     }
   }
 
