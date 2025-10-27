@@ -218,6 +218,8 @@ export default class Crypto extends WebWorker() {
    * @returns {Promise<KEY>}
    */
   static async #_deriveSyncKeyFromAsyncKeyPair (privateKey, publicKey, keyUsages, epoch) {
+    // todo: map cache derived jwk string as map key
+    // todo: derive from jwk
     return {
       cryptoKey: await self.crypto.subtle.deriveKey(
         { 
@@ -263,6 +265,8 @@ export default class Crypto extends WebWorker() {
    * @returns {Promise<ENCRYPTED>}
    */
   static async #_encrypt (text, key, epoch) {
+    // todo: map cache encrypt jwk string as map key optional
+    // todo: encrypt from jwk
     const name = 'AES-GCM'
     // IV should be 96 bits long [96 bits / 8 = 12 bytes] and unique for each encryption (https://developer.mozilla.org/en-US/docs/Web/API/AesGcmParams#iv)
     const iv = self.crypto.getRandomValues(new Uint8Array(12))
@@ -308,6 +312,8 @@ export default class Crypto extends WebWorker() {
    * @returns {Promise<DECRYPTED|{ error: true, message: string, encrypted: ENCRYPTED, key: KEY }>}
    */
   static async #_decrypt (encrypted, key, epoch) {
+    // todo: map cache decrypt jwk string as map key optional
+    // todo: decrypt from jwk
     try {
       return {
         text: new TextDecoder().decode(await self.crypto.subtle.decrypt(
