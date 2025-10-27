@@ -147,6 +147,7 @@ export default class Crypto extends WebWorker() {
     
   }
 
+  /** ---generateSyncKey--- */
   /**
    * get new synchronous JsonWebKey
    * 
@@ -159,7 +160,6 @@ export default class Crypto extends WebWorker() {
     // @ts-ignore
     return key
   }
-
   /**
    * get new synchronous key
    * 
@@ -169,7 +169,6 @@ export default class Crypto extends WebWorker() {
   async generateSyncKey () {
     return this.webWorker(Crypto.#_generateSyncKey, Crypto.#epochDateNow)
   }
-
   /**
    * get new synchronous key
    * 
@@ -192,6 +191,7 @@ export default class Crypto extends WebWorker() {
     }
   }
 
+  /** ---generateAsyncKeyPair--- */
   /**
    * get new asynchronous JsonWebKey pair
    * 
@@ -205,7 +205,6 @@ export default class Crypto extends WebWorker() {
     // @ts-ignore
     return keys
   }
-
   /**
    * get new asynchronous key pair
    * 
@@ -215,7 +214,6 @@ export default class Crypto extends WebWorker() {
   async generateAsyncKeyPair () {
     return this.webWorker(Crypto.#_generateAsyncKeyPair, Crypto.#epochDateNow)
   }
-
   /**
    * get new asynchronous key pair
    * 
@@ -245,6 +243,7 @@ export default class Crypto extends WebWorker() {
     }
   }
 
+  /** ---deriveSyncKeyFromAsyncKeyPair--- */
   /**
    * deriveSyncKeyFromAsyncKeyPair JsonWebKeys
    * typically created with own privateKey and foreign publicKey
@@ -268,7 +267,6 @@ export default class Crypto extends WebWorker() {
     // @ts-ignore
     return cryptoKey
   }
-
   /**
    * deriveSyncKeyFromAsyncKeyPair
    * typically created with own privateKey and foreign publicKey
@@ -283,7 +281,6 @@ export default class Crypto extends WebWorker() {
   async deriveSyncKeyFromAsyncKeyPair (privateKey, publicKey, keyUsages = ['encrypt', 'decrypt']) {
     return this.webWorker(Crypto.#_deriveSyncKeyFromAsyncKeyPair, privateKey, publicKey, keyUsages, Crypto.#epochDateNow)
   }
-
   /**
    * deriveSyncKeyFromAsyncKeyPair
    * typically created with own privateKey and foreign publicKey
@@ -320,6 +317,7 @@ export default class Crypto extends WebWorker() {
     }
   }
 
+  /** ---encrypt--- */
   /**
    * encrypt by JsonWebKeys
    * 
@@ -337,7 +335,6 @@ export default class Crypto extends WebWorker() {
     Crypto.#encryptedCache.set(mapKey, encrypted)
     return encrypted
   }
-
   /**
    * encrypt
    * 
@@ -349,7 +346,6 @@ export default class Crypto extends WebWorker() {
   async encrypt (text, key) {
     return this.webWorker(Crypto.#_encrypt, text, key, Crypto.#epochDateNow)
   }
-
   /**
    * encrypt
    * 
@@ -383,6 +379,7 @@ export default class Crypto extends WebWorker() {
     }
   }
 
+  /** ---decrypt--- */
   /**
    * decrypt by JsonWebKeys
    * 
@@ -400,7 +397,6 @@ export default class Crypto extends WebWorker() {
     Crypto.#decryptedCache.set(mapKey, decrypted)
     return decrypted
   }
-
   /**
    * decrypt
    * 
@@ -412,7 +408,6 @@ export default class Crypto extends WebWorker() {
   async decrypt (encrypted, key) {
     return this.webWorker(Crypto.#_decrypt, encrypted, key, Crypto.#epochDateNow)
   }
-
   /**
    * decrypt
    * 
@@ -454,6 +449,7 @@ export default class Crypto extends WebWorker() {
     }
   }
 
+  /** ---jsonWebKeyToCryptoKey + cryptoKeyToJsonWebKey--- */
   /**
    * jsonWebKeyToCryptoKey
    * 
@@ -471,7 +467,6 @@ export default class Crypto extends WebWorker() {
     Crypto.#jsonWebCryptoKeysCache.set(jsonWebKey, cryptoKey)
     return cryptoKey
   }
-
   /**
    * jsonWebKeyToCryptoKey
    * 
@@ -512,7 +507,6 @@ export default class Crypto extends WebWorker() {
         : jsonWebKey.key_ops || []
     )
   }
-
   /**
    * cryptoKeyToJsonWebKey
    * 
@@ -528,7 +522,6 @@ export default class Crypto extends WebWorker() {
     Crypto.#jsonWebCryptoKeysCache.set(jsonWebKey, cryptoKey)
     return jsonWebKey
   }
-
   /**
    * cryptoKeyToJsonWebKey
    * 
@@ -542,6 +535,7 @@ export default class Crypto extends WebWorker() {
     return await self.crypto.subtle.exportKey(format, cryptoKey)
   }
 
+  /** ---other--- */
   /**
    * @static
    * @return {string}
