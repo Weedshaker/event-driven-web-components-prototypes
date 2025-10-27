@@ -69,7 +69,7 @@ export default class Crypto extends WebWorker() {
      */
     get set() {
       return (jsonWebKey, cryptoKey) => {
-          // @ts-ignore
+        // @ts-ignore
         this.cryptoKeysCache.set(
           typeof jsonWebKey === 'string'
             ? jsonWebKey
@@ -248,6 +248,7 @@ export default class Crypto extends WebWorker() {
   /**
    * deriveSyncKeyFromAsyncKeyPair JsonWebKeys
    * typically created with own privateKey and foreign publicKey
+   * creates the same key with own privateKey and foreign publicKey as with own publicKey and foreign privateKey
    * 
    * @async
    * @param {KEY & {jsonWebKey: JSONWEBKEY_STRING}} privateKey
@@ -271,6 +272,7 @@ export default class Crypto extends WebWorker() {
   /**
    * deriveSyncKeyFromAsyncKeyPair
    * typically created with own privateKey and foreign publicKey
+   * creates the same key with own privateKey and foreign publicKey as with own publicKey and foreign privateKey
    * 
    * @async
    * @param {KEY} privateKey
@@ -285,6 +287,7 @@ export default class Crypto extends WebWorker() {
   /**
    * deriveSyncKeyFromAsyncKeyPair
    * typically created with own privateKey and foreign publicKey
+   * creates the same key with own privateKey and foreign publicKey as with own publicKey and foreign privateKey
    * 
    * @async
    * @static
