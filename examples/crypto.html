@@ -7,33 +7,59 @@
 </head>
 <body>
   <c-crypto>
+    <!-- generate -->
+    <div class="generate">
+      <h2>Generate Key(s)</h2>
+      <button synchronous>generate synchronous key</button>
+      <button asynchronous>generate asynchronous key</button>
+      <code class="result" hidden><span>Result: </span><textarea></textarea></code>
+    </div>
+    <hr>
+    <!-- derive -->
+    <div class="derive">
+      <h2>Derive Key</h2>
+      <code class="code">
+        <textarea placeholder="private-key"></textarea>
+      </code>
+      <code class="code">
+        <textarea placeholder="public-key"></textarea>
+      </code>
+      <button>derive key</button>
+      <code class="result" hidden><span>Result: </span><textarea></textarea></code>
+    </div>
+    <hr>
     <!-- encrypt -->
-    <!-- 
     <div class="encrypt">
       <h2>Encrypt text</h2>
       <code class="code">
-        <textarea></textarea>
+        <textarea placeholder="text"></textarea>
+      </code>
+      <code class="code">
+        <textarea placeholder="key"></textarea>
       </code>
       <button>encrypt</button>
       <code class="result">Result: <pre></pre></code>
     </div>
     <hr>
-    -->
     <!-- decrypt -->
-    <!-- 
     <div class="decrypt">
       <h2>Decrypt text</h2>
       <code class="code">
-        <textarea></textarea>
+        <textarea placeholder="encrypted"></textarea>
+      </code>
+      <code class="code">
+        <textarea placeholder="key"></textarea>
       </code>
       <button>decrypt</button>
       <code class="result">Result: <pre></pre></code>
     </div>
-    -->
   </c-crypto>
   <style>
-    .decrypt, .encrypt {
+    .derive, .generate, .decrypt, .encrypt {
       cursor: pointer;
+    }
+    .result {
+      cursor: auto;
     }
     code, button {
       display: block;
@@ -64,6 +90,9 @@
     div > *:not(h2) {
       margin-left: 2em;
     }
+    *[hidden] {
+      display: none;
+    }
   </style>
   <script rel=preload type=module>
     Promise.all([
@@ -72,30 +101,81 @@
       // don't define already existing customElements
       if (element && !customElements.get(element[0])) customElements.define(...element)
     }))
-    // prevent textarea to send click event
-    document.body.querySelectorAll('textarea').forEach(el => el.addEventListener('click', event => event.stopPropagation()))
+    // prevent code to send click event
+    document.body.querySelectorAll('code').forEach(el => el.addEventListener('click', event => event.stopPropagation()))
+    // generate
+    const generateEls = document.body.querySelectorAll('.generate')
+    generateEls.forEach(el => el.addEventListener('click', event => new Promise(resolve => el.dispatchEvent(new CustomEvent('crypto-generate-key', {
+      detail: {
+        resolve,
+        jsonWebKey: true,
+        synchronous: event.composedPath()[0]?.hasAttribute('synchronous')
+      },
+      bubbles: true,
+      cancelable: true,
+      composed: true
+    }))).then(result => {
+      const newResult = el.querySelector('code.result').cloneNode(true)
+      newResult.removeAttribute('hidden')
+      const keyType = result.publicKey ? 'asynchronous' : 'synchronous'
+      newResult.setAttribute('key', keyType)
+      newResult.querySelector('code.result > span').textContent = `${result.publicKey ? 'asynchronous key pair' : 'synchronous key'} ${Array.from(el.parentNode.querySelectorAll(`code.result[key=${keyType}]`)).length + 1}`
+      newResult.querySelector('code.result > textarea').textContent = JSON.stringify(result, undefined, 2)
+      el.after(newResult)
+    })))
+    // derive
+    const deriveEls = document.body.querySelectorAll('.derive')
+    deriveEls.forEach(el => el.addEventListener('click', event => new Promise(resolve => el.dispatchEvent(new CustomEvent('crypto-derive-key', {
+      detail: {
+        resolve,
+        jsonWebKey: true,
+        publicKey: JSON.parse(el.querySelector('code.code > textarea[placeholder=public-key]').value),
+        privateKey: JSON.parse(el.querySelector('code.code > textarea[placeholder=private-key]').value)
+      },
+      bubbles: true,
+      cancelable: true,
+      composed: true
+    }))).then(result => {
+      const newResult = el.querySelector('code.result').cloneNode(true)
+      newResult.removeAttribute('hidden')
+      const keyType = 'synchronous'
+      newResult.setAttribute('key', keyType)
+      newResult.querySelector('code.result > span').textContent = `${result.publicKey ? 'asynchronous key pair' : 'synchronous key'} ${Array.from(el.parentNode.querySelectorAll(`code.result[key=${keyType}]`)).length + 1}`
+      newResult.querySelector('code.result > textarea').textContent = JSON.stringify(result, undefined, 2)
+      el.after(newResult)
+    })))
     // encrypt
     const encryptEls = document.body.querySelectorAll('.encrypt')
-    encryptEls.forEach(el => el.addEventListener('click', event => new Promise(resolve => el.dispatchEvent(new CustomEvent('crypto-encrypt', {
-      detail: {
-        resolve,
-        value: JSON.parse(el.querySelector('code.code > textarea').value)
-      },
-      bubbles: true,
-      cancelable: true,
-      composed: true
-    }))).then(result => (el.querySelector('code.result > pre').textContent = JSON.stringify(result, undefined, 2)))))
+    encryptEls.forEach(el => el.addEventListener('click', event => {
+      el.querySelector('code.result > pre').textContent = ''
+      new Promise(resolve => el.dispatchEvent(new CustomEvent('crypto-encrypt', {
+        detail: {
+          resolve,
+          jsonWebKey: true,
+          text: el.querySelector('code.code > textarea[placeholder=text]').value,
+          key: JSON.parse(el.querySelector('code.code > textarea[placeholder=key]').value)
+        },
+        bubbles: true,
+        cancelable: true,
+        composed: true
+      }))).then(result => (el.querySelector('code.result > pre').textContent = JSON.stringify(result, undefined, 2)))
+    }))
     // decrypt
     const decryptEls = document.body.querySelectorAll('.decrypt')
-    decryptEls.forEach(el => el.addEventListener('click', event => new Promise(resolve => el.dispatchEvent(new CustomEvent('crypto-decrypt', {
-      detail: {
-        resolve,
-        value: JSON.parse(el.querySelector('code.code > textarea').value)
-      },
-      bubbles: true,
-      cancelable: true,
-      composed: true
-    }))).then(result => (el.querySelector('code.result > pre').textContent = JSON.stringify(result, undefined, 2)))))
+    decryptEls.forEach(el => el.addEventListener('click', event => {
+      el.querySelector('code.result > pre').textContent = ''
+      new Promise(resolve => el.dispatchEvent(new CustomEvent('crypto-decrypt', {
+        detail: {
+          resolve,
+          jsonWebKey: true,
+          encrypted: JSON.parse(el.querySelector('code.code > textarea[placeholder=encrypted]').value),
+          key: JSON.parse(el.querySelector('code.code > textarea[placeholder=key]').value)
+        },
+        bubbles: true,
+        cancelable: true,
+        composed: true
+      }))).then(result => (el.querySelector('code.result > pre').textContent = JSON.stringify(result, undefined, 2)))
+    }))
   </script>
 </body>
 </html>
