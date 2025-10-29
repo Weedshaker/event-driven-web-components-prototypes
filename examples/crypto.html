@@ -158,7 +158,9 @@
         bubbles: true,
         cancelable: true,
         composed: true
-      }))).then(result => (el.querySelector('code.result > pre').textContent = JSON.stringify(result, undefined, 2)))
+      }))).then(result => {
+        console.log('*********', result)
+        el.querySelector('code.result > pre').textContent = JSON.stringify(result, undefined, 2)})
     }))
     // decrypt
     const decryptEls = document.body.querySelectorAll('.decrypt')
