@@ -6,8 +6,9 @@ import { WebWorker } from '../WebWorker.js'
 /** @typedef {{ epoch:string, derived?: DERIVED_KEY }} KEY_EPOCH */
 /** @typedef {JsonWebKey | string} JSONWEBKEY_STRING */
 /** @typedef {{ cryptoKey: CryptoKey, jsonWebKey?: JSONWEBKEY_STRING | string, epoch: string, derived?: DERIVED_KEY }} KEY */
-/** @typedef {{ text: string, iv: Uint8Array<ArrayBuffer>, name: string, epoch: string, key: KEY_EPOCH }} ENCRYPTED */
+/** @typedef {{ text: string, iv: Uint8Array<ArrayBuffer>, name: string, key: KEY_EPOCH }} ENCRYPTED */ // text: JSON.stringify({text: string, epoch: string})
 /** @typedef {{ text: string, epoch: string, encrypted: { epoch: string, key: KEY_EPOCH }, key: KEY_EPOCH }} DECRYPTED */
+/** @typedef {{ error: true, message: string, encrypted: ENCRYPTED, key: KEY }} DECRYPTED_ERROR */
 
 /**
  * As a controller, this component becomes a crypto manager and organizes events
@@ -104,7 +105,7 @@ export default class Crypto extends WebWorker() {
   /**
    * caching the decrypted (plain) text by the jsonWebKey and encrypted text as map-key
    *
-   * @type {Map<string, DECRYPTED>}
+   * @type {Map<string, DECRYPTED | DECRYPTED_ERROR>}
    */
   static #decryptedCache = new Map()
 
@@ -112,10 +113,68 @@ export default class Crypto extends WebWorker() {
     super()
 
     this.separator = this.getAttribute('separator') || options.separator
-    this.startExample()
+
+    /**
+     * Generate Key Event Listener
+     *
+     * @param {CustomEvent & {detail: {synchronous: boolean, jsonWebKey: boolean, resolve?: () => Promise<KEY | { publicKey: KEY, privateKey: KEY }>}}} event
+     * @return {any}
+     */
+    this.generateKeyEventListener = event => {
+      this.respond(event.detail?.resolve, event.detail?.name || 'crypto-generated-key', event.detail?.synchronous
+        ? event.detail?.jsonWebKey
+          ? this.generateSyncJsonWebKey()
+          : this.generateSyncKey()
+        : event.detail?.jsonWebKey
+          ? this.generateAsyncJsonWebKeyPair()
+          : this.generateAsyncKeyPair()
+      )
+    }
+
+    /**
+     * Derive Key Event Listener
+     *
+     * @param {CustomEvent & {detail: {jsonWebKey: boolean, privateKey: KEY, publicKey: KEY, keyUsages: string[], resolve?: () => Promise<KEY>}}} event
+     * @return {any}
+     */
+    this.deriveKeyEventListener = event => {
+      this.respond(event.detail?.resolve, event.detail?.name || 'crypto-derived-key', event.detail?.jsonWebKey
+        ? this.deriveSyncJsonWebKeyFromAsyncJsonWebKeyPair(event.detail.privateKey, event.detail.publicKey, event.detail.keyUsages)
+        : this.deriveSyncKeyFromAsyncKeyPair(event.detail.privateKey, event.detail.publicKey, event.detail.keyUsages)
+      )
+    }
+
+    /**
+     * Encrypt Event Listener
+     *
+     * @param {CustomEvent & {detail: {jsonWebKey: boolean, text: string, key: KEY, resolve?: () => Promise<ENCRYPTED>}}} event
+     * @return {any}
+     */
+    this.encryptEventListener = event => {
+      this.respond(event.detail?.resolve, event.detail?.name || 'crypto-encrypted', event.detail?.jsonWebKey
+        ? this.encryptWithJsonWebKey(event.detail.text, event.detail.key)
+        : this.encrypt(event.detail.text, event.detail.key)
+      )
+    }
+
+    /**
+     * Decrypt Event Listener
+     *
+     * @param {CustomEvent & {detail: {jsonWebKey: boolean, encrypted: ENCRYPTED, key: KEY, resolve?: () => Promise<DECRYPTED>}}} event
+     * @return {any}
+     */
+    this.decryptEventListener = event => {
+      this.respond(event.detail?.resolve, event.detail?.name || 'crypto-decrypted', event.detail?.jsonWebKey
+        ? this.decryptWithJsonWebKey(event.detail.encrypted, event.detail.key)
+        : this.decrypt(event.detail.encrypted, event.detail.key)
+      )
+    }
+
+    //this.startTest()
   }
 
-  async startExample () {
+  /*
+  async startTest () {
     console.log('****caches*****', {
       derivedKeysCache: Crypto.#derivedKeysCache, 
       encryptedCache: Crypto.#encryptedCache,
@@ -135,16 +194,21 @@ export default class Crypto extends WebWorker() {
     const decryptedAliceToBob = await this.decryptWithJsonWebKey(encryptedAliceToBob, bobToAliceAsyncJsonWebKey)
 
     console.log('*********', {encryptedBobToAlice, encryptedAliceToBob, decryptedBobToAlice, decryptedAliceToBob})
-
-    // TODO: EventDriven analog Storage.js
   }
+  */
 
   connectedCallback () {
-    
+    this.addEventListener(this.getAttribute('crypto-generate-key') || 'crypto-generate-key', this.generateKeyEventListener)
+    this.addEventListener(this.getAttribute('crypto-derive-key') || 'crypto-derive-key', this.deriveKeyEventListener)
+    this.addEventListener(this.getAttribute('crypto-encrypt') || 'crypto-encrypt', this.encryptEventListener)
+    this.addEventListener(this.getAttribute('crypto-decrypt') || 'crypto-decrypt', this.decryptEventListener)
   }
 
   disconnectedCallback () {
-    
+    this.removeEventListener(this.getAttribute('crypto-generate-key') || 'crypto-generate-key', this.generateKeyEventListener)
+    this.removeEventListener(this.getAttribute('crypto-derive-key') || 'crypto-derive-key', this.deriveKeyEventListener)
+    this.removeEventListener(this.getAttribute('crypto-encrypt') || 'crypto-encrypt', this.encryptEventListener)
+    this.removeEventListener(this.getAttribute('crypto-decrypt') || 'crypto-decrypt', this.decryptEventListener)
   }
 
   /** ---generateSyncKey--- */
@@ -256,14 +320,16 @@ export default class Crypto extends WebWorker() {
    * @returns {Promise<KEY & {jsonWebKey: JSONWEBKEY_STRING}>}
    */
   async deriveSyncJsonWebKeyFromAsyncJsonWebKeyPair (privateKey, publicKey, keyUsages = ['encrypt', 'decrypt']) {
-    const mapKey = `${typeof privateKey.jsonWebKey === 'string' ? privateKey.jsonWebKey : JSON.stringify(privateKey.jsonWebKey)}${this.separator}${typeof publicKey.jsonWebKey === 'string' ? publicKey.jsonWebKey : JSON.stringify(publicKey.jsonWebKey)}`
+    const mapKey = privateKey.jsonWebKey && publicKey.jsonWebKey
+      ? `${typeof privateKey.jsonWebKey === 'string' ? privateKey.jsonWebKey : JSON.stringify(privateKey.jsonWebKey)}${this.separator}${typeof publicKey.jsonWebKey === 'string' ? publicKey.jsonWebKey : JSON.stringify(publicKey.jsonWebKey)}`
+      : null
     // @ts-ignore
-    if (Crypto.#derivedKeysCache.has(mapKey)) return Crypto.#derivedKeysCache.get(mapKey)
+    if (mapKey && Crypto.#derivedKeysCache.has(mapKey)) return Crypto.#derivedKeysCache.get(mapKey)
     if (!privateKey.cryptoKey) privateKey.cryptoKey = await this.jsonWebKeyToCryptoKey(privateKey.jsonWebKey)
     if (!publicKey.cryptoKey) publicKey.cryptoKey = await this.jsonWebKeyToCryptoKey(publicKey.jsonWebKey)
     const cryptoKey = await this.deriveSyncKeyFromAsyncKeyPair(privateKey, publicKey, keyUsages)
     cryptoKey.jsonWebKey = await this.cryptoKeyToJsonWebKey(cryptoKey.cryptoKey)
-    Crypto.#derivedKeysCache.set(mapKey, cryptoKey)
+    if (mapKey) Crypto.#derivedKeysCache.set(mapKey, cryptoKey)
     // @ts-ignore
     return cryptoKey
   }
@@ -327,12 +393,14 @@ export default class Crypto extends WebWorker() {
    * @returns {Promise<ENCRYPTED>}
    */
   async encryptWithJsonWebKey (text, key) {
-    const mapKey = `${text}${this.separator}${typeof key.jsonWebKey === 'string' ? key.jsonWebKey : JSON.stringify(key.jsonWebKey)}`
+    const mapKey = key.jsonWebKey
+      ? `${text}${this.separator}${typeof key.jsonWebKey === 'string' ? key.jsonWebKey : JSON.stringify(key.jsonWebKey)}`
+      : null
     // @ts-ignore
-    if (Crypto.#encryptedCache.has(mapKey)) return Crypto.#encryptedCache.get(mapKey)
+    if (mapKey && Crypto.#encryptedCache.has(mapKey)) return Crypto.#encryptedCache.get(mapKey)
     if (!key.cryptoKey) key.cryptoKey = await this.jsonWebKeyToCryptoKey(key.jsonWebKey)
-    const encrypted = await this.webWorker(Crypto.#_encrypt, text, key, Crypto.#epochDateNow)
-    Crypto.#encryptedCache.set(mapKey, encrypted)
+    const encrypted = await this.encrypt(text, key)
+    if (mapKey) Crypto.#encryptedCache.set(mapKey, encrypted)
     return encrypted
   }
   /**
@@ -367,11 +435,13 @@ export default class Crypto extends WebWorker() {
           iv
         },
         key.cryptoKey,
-        new TextEncoder().encode(text)
+        new TextEncoder().encode(JSON.stringify({
+          text,
+          epoch
+        }))
       )))),
       iv,
       name,
-      epoch,
       key: {
         epoch: key.epoch,
         derived: key.derived
@@ -386,15 +456,17 @@ export default class Crypto extends WebWorker() {
    * @async
    * @param {ENCRYPTED} encrypted
    * @param {KEY & {jsonWebKey: JSONWEBKEY_STRING}} key
-   * @returns {Promise<ENCRYPTED>}
+   * @returns {Promise<DECRYPTED|DECRYPTED_ERROR>}
    */
   async decryptWithJsonWebKey (encrypted, key) {
-    const mapKey = `${encrypted.text}${this.separator}${encrypted.iv}${this.separator}${typeof key.jsonWebKey === 'string' ? key.jsonWebKey : JSON.stringify(key.jsonWebKey)}`
+    const mapKey = key.jsonWebKey
+      ? `${encrypted.text}${this.separator}${encrypted.iv}${this.separator}${typeof key.jsonWebKey === 'string' ? key.jsonWebKey : JSON.stringify(key.jsonWebKey)}`
+      : null
     // @ts-ignore
-    if (Crypto.#decryptedCache.has(mapKey)) return Crypto.#decryptedCache.get(mapKey)
+    if (mapKey && Crypto.#decryptedCache.has(mapKey)) return Crypto.#decryptedCache.get(mapKey)
     if (!key.cryptoKey) key.cryptoKey = await this.jsonWebKeyToCryptoKey(key.jsonWebKey)
-    const decrypted = await this.webWorker(Crypto.#_decrypt, encrypted, key, Crypto.#epochDateNow)
-    Crypto.#decryptedCache.set(mapKey, decrypted)
+    const decrypted = await this.decrypt(encrypted, key)
+    if (mapKey) Crypto.#decryptedCache.set(mapKey, decrypted)
     return decrypted
   }
   /**
@@ -403,7 +475,7 @@ export default class Crypto extends WebWorker() {
    * @async
    * @param {ENCRYPTED} encrypted
    * @param {KEY} key
-   * @returns {Promise<DECRYPTED|{ error: true, message: string, encrypted: ENCRYPTED, key: KEY }>}
+   * @returns {Promise<DECRYPTED|DECRYPTED_ERROR>}
    */
   async decrypt (encrypted, key) {
     return this.webWorker(Crypto.#_decrypt, encrypted, key, Crypto.#epochDateNow)
@@ -416,22 +488,24 @@ export default class Crypto extends WebWorker() {
    * @param {ENCRYPTED} encrypted
    * @param {KEY} key
    * @param {string} epoch
-   * @returns {Promise<DECRYPTED|{ error: true, message: string, encrypted: ENCRYPTED, key: KEY }>}
+   * @returns {Promise<DECRYPTED|DECRYPTED_ERROR>}
    */
   static async #_decrypt (encrypted, key, epoch) {
     try {
+      const decrypted = JSON.parse(new TextDecoder().decode(await self.crypto.subtle.decrypt(
+        {
+          name: encrypted.name,
+          iv: encrypted.iv
+        },
+        key.cryptoKey,
+        Uint8Array.from(atob(encrypted.text), char => char.charCodeAt(0))
+      )))
+      if (!decrypted.text || !decrypted.epoch) throw new Error(`JSON with property text was expected at encrypted text! Only decrypt strings which were encrypted with this class. | ${JSON.stringify(decrypted)}`)
       return {
-        text: new TextDecoder().decode(await self.crypto.subtle.decrypt(
-          {
-            name: encrypted.name,
-            iv: encrypted.iv
-          },
-          key.cryptoKey,
-          Uint8Array.from(atob(encrypted.text), char => char.charCodeAt(0))
-        )),
+        text: decrypted.text,
         epoch,
         encrypted: {
-          epoch: encrypted.epoch,
+          epoch: decrypted.epoch,
           key: encrypted.key
         },
         key: {
@@ -442,7 +516,7 @@ export default class Crypto extends WebWorker() {
     } catch (error) {
       return {
         error: true,
-        message: `error decrypting encrypted: ${error}`,
+        message: `Error decrypting encrypted: ${error}`,
         encrypted,
         key
       }
