@@ -463,7 +463,7 @@ export default class Crypto extends WebWorker() {
    * @returns {Promise<DECRYPTED|DECRYPTED_ERROR|JSON_WEB_KEY_TO_CRYPTOKEY_ERROR>}
    */
   async decryptWithJsonWebKey (encrypted, key) {
-    if (!(encrypted.iv instanceof Uint8Array)) encrypted.iv = new Uint8Array(Object.values(encrypted.iv))
+    if (!(encrypted.iv instanceof Uint8Array) && typeof encrypted.iv === 'object') encrypted.iv = new Uint8Array(Object.values(encrypted.iv))
     const mapKey = key.jsonWebKey
       ? `${encrypted.text}${this.separator}${encrypted.iv}${this.separator}${typeof key.jsonWebKey === 'string' ? key.jsonWebKey : JSON.stringify(key.jsonWebKey)}`
       : null
@@ -501,6 +501,12 @@ export default class Crypto extends WebWorker() {
    * @returns {Promise<DECRYPTED|DECRYPTED_ERROR>}
    */
   static async #_decrypt (encrypted, key, epoch) {
+    if (!(encrypted.iv instanceof Uint8Array)) return {
+      error: true,
+      message: 'Error decrypting; iv not as Uint8Array supplied!',
+      encrypted,
+      key
+    }
     try {
       const decrypted = JSON.parse(new TextDecoder().decode(await self.crypto.subtle.decrypt(
         {
