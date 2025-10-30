@@ -159,7 +159,6 @@
         cancelable: true,
         composed: true
       }))).then(result => {
-        console.log('*********', result)
         el.querySelector('code.result > pre').textContent = JSON.stringify(result, undefined, 2)})
     }))
     // decrypt
