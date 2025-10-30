@@ -8,6 +8,7 @@ import { WebWorker } from '../WebWorker.js'
 /** @typedef {{ cryptoKey: CryptoKey, jsonWebKey?: JSONWEBKEY_STRING | string, epoch: string, derived?: DERIVED_KEY }} KEY */
 /** @typedef {{ text: string, iv: Uint8Array<ArrayBuffer>, name: string, key: KEY_EPOCH }} ENCRYPTED */ // text: JSON.stringify({text: string, epoch: string})
 /** @typedef {{ text: string, epoch: string, encrypted: { epoch: string, key: KEY_EPOCH }, key: KEY_EPOCH }} DECRYPTED */
+/** @typedef {{ error: true, message: string, privateKey: KEY, publicKey: KEY }} DERIVE_ERROR */
 /** @typedef {{ error: true, message: string, encrypted: ENCRYPTED, key: KEY }} DECRYPTED_ERROR */
 /** @typedef {{ error: true, message: string, jsonWebKey: JsonWebKey }} JSON_WEB_KEY_TO_CRYPTOKEY_ERROR */
 
@@ -313,7 +314,11 @@ export default class Crypto extends WebWorker() {
       if (publicKey.cryptoKey.error) return publicKey.cryptoKey
     }
     const cryptoKey = await this.deriveSyncKeyFromAsyncKeyPair(privateKey, publicKey, keyUsages)
+    // @ts-ignore
+    if (cryptoKey.error) return cryptoKey
+    // @ts-ignore
     cryptoKey.jsonWebKey = await this.cryptoKeyToJsonWebKey(cryptoKey.cryptoKey)
+    // @ts-ignore
     if (mapKey) Crypto.#derivedKeysCache.set(mapKey, cryptoKey)
     // @ts-ignore
     return cryptoKey
@@ -327,7 +332,7 @@ export default class Crypto extends WebWorker() {
    * @param {KEY} privateKey
    * @param {KEY} publicKey
    * @param {KeyUsage[]} [keyUsages=['encrypt', 'decrypt']]
-   * @returns {Promise<KEY>}
+   * @returns {Promise<KEY|DERIVE_ERROR>}
    */
   async deriveSyncKeyFromAsyncKeyPair (privateKey, publicKey, keyUsages = ['encrypt', 'decrypt']) {
     return this.webWorker(Crypto.#_deriveSyncKeyFromAsyncKeyPair, privateKey, publicKey, keyUsages, Crypto.#epochDateNow)
@@ -343,27 +348,36 @@ export default class Crypto extends WebWorker() {
    * @param {KEY} publicKey
    * @param {KeyUsage[]} keyUsages
    * @param {string} epoch
-   * @returns {Promise<KEY>}
+   * @returns {Promise<KEY|DERIVE_ERROR>}
    */
   static async #_deriveSyncKeyFromAsyncKeyPair (privateKey, publicKey, keyUsages, epoch) {
-    return {
-      cryptoKey: await self.crypto.subtle.deriveKey(
-        { 
-          name: 'ECDH',
-          public: publicKey.cryptoKey
-        },
-        privateKey.cryptoKey,
-        {
-          name: 'AES-GCM',
-          length: 256
-        },
-        true,
-        keyUsages
-      ),
-      epoch,
-      derived: {
-        privateKeyEpoch: privateKey.epoch,
-        publicKeyEpoch: publicKey.epoch
+    try {
+      return {
+        cryptoKey: await self.crypto.subtle.deriveKey(
+          { 
+            name: 'ECDH',
+            public: publicKey.cryptoKey
+          },
+          privateKey.cryptoKey,
+          {
+            name: 'AES-GCM',
+            length: 256
+          },
+          true,
+          keyUsages
+        ),
+        epoch,
+        derived: {
+          privateKeyEpoch: privateKey.epoch,
+          publicKeyEpoch: publicKey.epoch
+        }
+      }
+    } catch (error) {
+      return {
+        error: true,
+        message: `Error deriving sync key from async key pair: ${error}`,
+        privateKey,
+        publicKey
       }
     }
   }
@@ -549,6 +563,11 @@ export default class Crypto extends WebWorker() {
    * @returns {Promise<CryptoKey|JSON_WEB_KEY_TO_CRYPTOKEY_ERROR>}
    */
   static async #_jsonWebKeyToCryptoKey (jsonWebKey, algorithm, keyUsages, format) {
+    if (!jsonWebKey) return {
+      error: true,
+      message: `Error missing JsonWebKey!`,
+      jsonWebKey
+    }
     if (typeof jsonWebKey === 'string') jsonWebKey = JSON.parse(jsonWebKey)
     if (!algorithm) {
       algorithm = {

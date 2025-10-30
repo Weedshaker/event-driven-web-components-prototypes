@@ -41,7 +41,7 @@ export const WebWorker = (ChosenHTMLElement = HTMLElement) => class WebWorker ex
     func = func.replace(/this\./g, '')
     func = func.replace(new RegExp(`${this.constructor.name}\\.`, 'g'), '')
     func = /^.*?=>.*?/.test(func) ? `(${func})` : !/^function/.test(func) ? `function ${func}` : func
-    func = func.replace(/(.*)async\s(.*)/s, 'await async $1$2') // fix async function
+    func = func.replace(/(function\s)async\s(.*)/s, 'await async $1$2') // fix async function
     func = func.replace(/function\s#/, 'function ') // fix private functions
     const response = `onmessage=async (event)=>{postMessage(${func}(...event.data))}`
     let blob
