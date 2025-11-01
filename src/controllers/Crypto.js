@@ -9,6 +9,7 @@ import { WebWorker } from '../WebWorker.js'
 /** @typedef {{ text: string, iv: Uint8Array<ArrayBuffer>, name: string, key: KEY_EPOCH }} ENCRYPTED */ // text: JSON.stringify({text: string, epoch: string})
 /** @typedef {{ text: string, epoch: string, encrypted: { epoch: string, key: KEY_EPOCH }, key: KEY_EPOCH }} DECRYPTED */
 /** @typedef {{ error: true, message: string, privateKey: KEY, publicKey: KEY }} DERIVE_ERROR */
+/** @typedef {{ error: true, message: string, text: string, key: KEY }} ENCRYPTED_ERROR */
 /** @typedef {{ error: true, message: string, encrypted: ENCRYPTED, key: KEY }} DECRYPTED_ERROR */
 /** @typedef {{ error: true, message: string, jsonWebKey: JsonWebKey }} JSON_WEB_KEY_TO_CRYPTOKEY_ERROR */
 
@@ -100,7 +101,7 @@ export default class Crypto extends WebWorker() {
   /**
    * caching the encrypted text by the jsonWebKey and plain text as map-key
    *
-   * @type {Map<string, ENCRYPTED>}
+   * @type {Map<string, ENCRYPTED | ENCRYPTED_ERROR>}
    */
   static #encryptedCache = new Map()
 
@@ -389,7 +390,7 @@ export default class Crypto extends WebWorker() {
    * @async
    * @param {string} text
    * @param {KEY & {jsonWebKey: JSONWEBKEY_STRING}} key
-   * @returns {Promise<ENCRYPTED | JSON_WEB_KEY_TO_CRYPTOKEY_ERROR>}
+   * @returns {Promise<ENCRYPTED | ENCRYPTED_ERROR | JSON_WEB_KEY_TO_CRYPTOKEY_ERROR>}
    */
   async encryptWithJsonWebKey (text, key) {
     const mapKey = key.jsonWebKey
@@ -413,7 +414,7 @@ export default class Crypto extends WebWorker() {
    * @async
    * @param {string} text
    * @param {KEY} key
-   * @returns {Promise<ENCRYPTED>}
+   * @returns {Promise<ENCRYPTED|ENCRYPTED_ERROR>}
    */
   async encrypt (text, key) {
     return this.webWorker(Crypto.#_encrypt, text, key, Crypto.#epochDateNow)
@@ -426,29 +427,38 @@ export default class Crypto extends WebWorker() {
    * @param {string} text
    * @param {KEY} key
    * @param {string} epoch
-   * @returns {Promise<ENCRYPTED>}
+   * @returns {Promise<ENCRYPTED|ENCRYPTED_ERROR>}
    */
   static async #_encrypt (text, key, epoch) {
     const name = 'AES-GCM'
     // IV should be 96 bits long [96 bits / 8 = 12 bytes] and unique for each encryption (https://developer.mozilla.org/en-US/docs/Web/API/AesGcmParams#iv)
     const iv = self.crypto.getRandomValues(new Uint8Array(12))
-    return {
-      text: btoa(String.fromCharCode(...new Uint8Array(await self.crypto.subtle.encrypt(
-        {
-          name,
-          iv
-        },
-        key.cryptoKey,
-        new TextEncoder().encode(JSON.stringify({
-          text,
-          epoch
-        }))
-      )))),
-      iv,
-      name,
-      key: {
-        epoch: key.epoch,
-        derived: key.derived
+    try {
+      return {
+        text: btoa(String.fromCharCode(...new Uint8Array(await self.crypto.subtle.encrypt(
+          {
+            name,
+            iv
+          },
+          key.cryptoKey,
+          new TextEncoder().encode(JSON.stringify({
+            text,
+            epoch
+          }))
+        )))),
+        iv,
+        name,
+        key: {
+          epoch: key.epoch,
+          derived: key.derived
+        }
+      }
+    }  catch (error) {
+      return {
+        error: true,
+        message: `Error encrypting text: ${error}`,
+        text,
+        key
       }
     }
   }
