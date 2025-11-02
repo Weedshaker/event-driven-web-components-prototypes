@@ -16,6 +16,7 @@ import { WebWorker } from '../WebWorker.js'
 /**
  * As a controller, this component becomes a crypto manager and organizes events
  * Inspired by: https://github.com/mdn/dom-examples/blob/main/web-crypto/derive-key/ecdh.js + https://getstream.io/blog/web-crypto-api-chat/
+ * Caches are not async with promises as values, due to minor advantages but higher complexity
  *
  * @export
  * @class Crypto
