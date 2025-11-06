@@ -5,7 +5,7 @@ import { WebWorker } from '../WebWorker.js'
 /** @typedef {{ privateKeyEpoch: string, publicKeyEpoch: string }} DERIVED_KEY */
 /** @typedef {{ epoch:string, derived?: DERIVED_KEY }} KEY_EPOCH */
 /** @typedef {JsonWebKey | string} JSONWEBKEY_STRING */
-/** @typedef {{ cryptoKey: CryptoKey, jsonWebKey?: JSONWEBKEY_STRING | string, epoch: string, derived?: DERIVED_KEY }} KEY */
+/** @typedef {{ cryptoKey: CryptoKey, jsonWebKey?: JSONWEBKEY_STRING | string, epoch: string, derived?: DERIVED_KEY, disabled?: boolean }} KEY */
 /** @typedef {{ publicKey: KEY, privateKey: KEY }} KEY_PAIR */
 /** @typedef {{ text: string, iv: Uint8Array<ArrayBuffer>, name: string, key: KEY_EPOCH }} ENCRYPTED */ // text: JSON.stringify({text: string, epoch: string})
 /** @typedef {{ text: string, epoch: string, encrypted: { epoch: string, key: KEY_EPOCH }, key: KEY_EPOCH }} DECRYPTED */
