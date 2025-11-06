@@ -6,6 +6,7 @@ import { WebWorker } from '../WebWorker.js'
 /** @typedef {{ epoch:string, derived?: DERIVED_KEY }} KEY_EPOCH */
 /** @typedef {JsonWebKey | string} JSONWEBKEY_STRING */
 /** @typedef {{ cryptoKey: CryptoKey, jsonWebKey?: JSONWEBKEY_STRING | string, epoch: string, derived?: DERIVED_KEY }} KEY */
+/** @typedef {{ publicKey: KEY, privateKey: KEY }} KEY_PAIR */
 /** @typedef {{ text: string, iv: Uint8Array<ArrayBuffer>, name: string, key: KEY_EPOCH }} ENCRYPTED */ // text: JSON.stringify({text: string, epoch: string})
 /** @typedef {{ text: string, epoch: string, encrypted: { epoch: string, key: KEY_EPOCH }, key: KEY_EPOCH }} DECRYPTED */
 /** @typedef {{ error: true, message: string, privateKey: KEY, publicKey: KEY }} DERIVE_ERROR */
@@ -121,7 +122,7 @@ export default class Crypto extends WebWorker() {
     /**
      * Generate Key Event Listener
      *
-     * @param {CustomEvent & {detail: {synchronous: boolean, jsonWebKey: boolean, resolve?: () => Promise<KEY | { publicKey: KEY, privateKey: KEY }>}}} event
+     * @param {CustomEvent & {detail: {synchronous: boolean, jsonWebKey: boolean, resolve?: () => Promise<KEY | KEY_PAIR>}}} event
      * @return {any}
      */
     this.generateKeyEventListener = event => {
@@ -238,7 +239,7 @@ export default class Crypto extends WebWorker() {
    * get new asynchronous JsonWebKey pair
    * 
    * @async
-   * @returns {Promise<{ publicKey: KEY & {jsonWebKey: JSONWEBKEY_STRING}, privateKey: KEY & {jsonWebKey: JSONWEBKEY_STRING} }>}
+   * @returns {Promise<KEY_PAIR>}
    */
   async generateAsyncJsonWebKeyPair () {
     const keys = await this.generateAsyncKeyPair()
@@ -251,7 +252,7 @@ export default class Crypto extends WebWorker() {
    * get new asynchronous key pair
    * 
    * @async
-   * @returns {Promise<{ publicKey: KEY, privateKey: KEY }>}
+   * @returns {Promise<KEY_PAIR>}
    */
   async generateAsyncKeyPair () {
     return this.webWorker(Crypto.#_generateAsyncKeyPair, Crypto.#epochDateNow)
@@ -262,7 +263,7 @@ export default class Crypto extends WebWorker() {
    * @async
    * @static
    * @param {string} epoch
-   * @returns {Promise<{ publicKey: KEY, privateKey: KEY }>}
+   * @returns {Promise<KEY_PAIR>}
    */
   static async #_generateAsyncKeyPair (epoch) {
     const {publicKey, privateKey} = await self.crypto.subtle.generateKey(
