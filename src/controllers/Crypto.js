@@ -174,6 +174,19 @@ export default class Crypto extends WebWorker() {
         : this.decrypt(event.detail.encrypted, event.detail.key)
       )
     }
+
+    //await this.jsonWebKeyToCryptoKey(privateKey.jsonWebKey)
+    /**
+     * jsonWebKeyToCryptoKey Event Listener
+     * user this to check the validity of the jsonWebKey
+     *
+     * @param {CustomEvent & {detail: {jsonWebKey: JsonWebKey, resolve?: () => Promise<CryptoKey|JSON_WEB_KEY_TO_CRYPTOKEY_ERROR>}}} event
+     * @return {any}
+     */
+    this.jsonWebKeyToCryptoKeyEventListener = event => {
+      this.respond(event.detail?.resolve, event.detail?.name || 'crypto-json-web-key-to-crypto-key', this.jsonWebKeyToCryptoKey(event.detail.jsonWebKey)
+      )
+    }
   }
 
   connectedCallback () {
@@ -181,6 +194,7 @@ export default class Crypto extends WebWorker() {
     this.addEventListener(this.getAttribute('crypto-derive-key') || 'crypto-derive-key', this.deriveKeyEventListener)
     this.addEventListener(this.getAttribute('crypto-encrypt') || 'crypto-encrypt', this.encryptEventListener)
     this.addEventListener(this.getAttribute('crypto-decrypt') || 'crypto-decrypt', this.decryptEventListener)
+    this.addEventListener(this.getAttribute('crypto-get-json-web-key-to-crypto-key') || 'crypto-get-json-web-key-to-crypto-key', this.jsonWebKeyToCryptoKeyEventListener)
   }
 
   disconnectedCallback () {
@@ -188,6 +202,7 @@ export default class Crypto extends WebWorker() {
     this.removeEventListener(this.getAttribute('crypto-derive-key') || 'crypto-derive-key', this.deriveKeyEventListener)
     this.removeEventListener(this.getAttribute('crypto-encrypt') || 'crypto-encrypt', this.encryptEventListener)
     this.removeEventListener(this.getAttribute('crypto-decrypt') || 'crypto-decrypt', this.decryptEventListener)
+    this.removeEventListener(this.getAttribute('crypto-get-json-web-key-to-crypto-key') || 'crypto-get-json-web-key-to-crypto-key', this.jsonWebKeyToCryptoKeyEventListener)
   }
 
   /** ---generateSyncKey--- */
