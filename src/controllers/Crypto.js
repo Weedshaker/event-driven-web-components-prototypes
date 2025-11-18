@@ -633,7 +633,7 @@ export default class Crypto extends WebWorker() {
   async cryptoKeyToJsonWebKey (cryptoKey, format = 'jwk') {
     // @ts-ignore
     if (Crypto.#jsonWebCryptoKeysCache.has(cryptoKey)) return Crypto.#jsonWebCryptoKeysCache.get(cryptoKey)
-    const jsonWebKey = await this.webWorker(Crypto.#_cryptoKeyToJsonWebKey, cryptoKey, format)
+    const jsonWebKey = Object.freeze(await this.webWorker(Crypto.#_cryptoKeyToJsonWebKey, cryptoKey, format))
     Crypto.#jsonWebCryptoKeysCache.set(jsonWebKey, cryptoKey)
     return jsonWebKey
   }
