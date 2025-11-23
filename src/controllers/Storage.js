@@ -280,7 +280,6 @@ export default class Storage extends WebWorker() {
           result.push(Storage.deepMerge(target[i] || target[Object.keys(target)[i]], source[i], concat, maxLength, uniqueArray, uniqueMap, arrayFilter))
         }
       }
-      if (maxLength && result.length > maxLength) result.length = maxLength
       if (uniqueArray) result = Array.from(new Set(result))
       if (uniqueMap && result.every(element => Array.isArray(element) && element.length === 2)) result = Array.from(new Map(result))
       if (arrayFilter) {
@@ -291,6 +290,7 @@ export default class Storage extends WebWorker() {
         }
         if (typeof arrayFilter === 'function') result = result.filter(arrayFilter)
       }
+      if (maxLength && result.length > maxLength) result.length = maxLength
     } else {
       result = {}
       for (const key of new Set([...Object.keys(target), ...Object.keys(source)])) {
