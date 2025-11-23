@@ -79,7 +79,7 @@ export default class Storage extends WebWorker() {
         await queuePromiseAll
         const oldValue = this.getListener(key, storage)
         this.oldStorage.set(key, structuredClone(oldValue))
-        const newValue = await this.webWorker(Storage.deepMerge, oldValue, value, event.detail?.concat, event.detail?.maxLength, event.detail?.uniqueArray, event.detail?.uniqueMap)
+        const newValue = await this.webWorker(Storage.deepMerge, oldValue, value, event.detail?.concat, event.detail?.maxLength, event.detail?.uniqueArray, event.detail?.uniqueMap, event.detail?.arrayFilter?.toString())
         // @ts-ignore
         queueResolve()
         this.queue.splice(this.queue.indexOf(queuePromise), 1)
@@ -201,7 +201,7 @@ export default class Storage extends WebWorker() {
     * @return {Promise<void>}
     */
     this.deepMergeListener = async event => {
-      this.respond(event.detail.resolve, undefined, { value: await this.webWorker(Storage.deepMerge, event.detail.target, event.detail.source, event.detail.concat, event.detail.maxLength, event.detail.uniqueArray, event.detail.uniqueMap) })
+      this.respond(event.detail.resolve, undefined, { value: await this.webWorker(Storage.deepMerge, event.detail.target, event.detail.source, event.detail.concat, event.detail.maxLength, event.detail.uniqueArray, event.detail.uniqueMap, event.detail.arrayFilter?.toString()) })
     }
   }
 
@@ -263,9 +263,10 @@ export default class Storage extends WebWorker() {
    * @param {false | number} [maxLength = false]
    * @param {boolean} [uniqueArray = false]
    * @param {boolean} [uniqueMap = false]
+   * @param {(element: any, index: number, array: any[]) => boolean} [arrayFilter = undefined]
    * @return {any}
    */
-  static deepMerge (target, source, concat = true, maxLength = false, uniqueArray = false, uniqueMap = false) {
+  static deepMerge (target, source, concat = true, maxLength = false, uniqueArray = false, uniqueMap = false, arrayFilter = undefined) {
     if (typeof target !== 'object' || typeof source !== 'object') return structuredClone(source === undefined ? target : source)
     let result
     if (Array.isArray(source)) {
@@ -276,16 +277,24 @@ export default class Storage extends WebWorker() {
       } else {
         result = []
         for (let i = 0; i < Math.max(target.length || Object.keys(target).length || 0, source.length || 0); i++) {
-          result.push(Storage.deepMerge(target[i] || target[Object.keys(target)[i]], source[i], concat, maxLength, uniqueArray, uniqueMap))
+          result.push(Storage.deepMerge(target[i] || target[Object.keys(target)[i]], source[i], concat, maxLength, uniqueArray, uniqueMap, arrayFilter))
         }
       }
       if (maxLength && result.length > maxLength) result.length = maxLength
       if (uniqueArray) result = Array.from(new Set(result))
       if (uniqueMap && result.every(element => Array.isArray(element) && element.length === 2)) result = Array.from(new Map(result))
+      if (arrayFilter) {
+        if (typeof arrayFilter === 'string') {
+          try {
+            arrayFilter = eval(arrayFilter)
+          } catch (error) {}
+        }
+        if (typeof arrayFilter === 'function') result = result.filter(arrayFilter)
+      }
     } else {
       result = {}
       for (const key of new Set([...Object.keys(target), ...Object.keys(source)])) {
-        result[key] = Storage.deepMerge(target[key], source[key], concat, maxLength, uniqueArray, uniqueMap)
+        result[key] = Storage.deepMerge(target[key], source[key], concat, maxLength, uniqueArray, uniqueMap, arrayFilter)
       }
     }
     return result
