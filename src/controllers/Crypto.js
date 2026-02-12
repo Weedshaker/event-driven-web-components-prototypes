@@ -331,7 +331,6 @@ export default class Crypto extends WebWorker() {
         epoch
       }
     }
-    
   }
 
   /** ---deriveSyncKeyFromAsyncKeyPair--- */

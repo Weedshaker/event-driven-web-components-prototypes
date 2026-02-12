@@ -43,6 +43,7 @@ export const WebWorker = (ChosenHTMLElement = HTMLElement) => class WebWorker ex
     func = /^.*?=>.*?/.test(func) ? `(${func})` : !/^function/.test(func) ? `function ${func}` : func
     func = func.replace(/(function\s)async\s(.*)/s, 'await async $1$2') // fix async function
     func = func.replace(/function\s#/, 'function ') // fix private functions
+    func = func.replace(/function\sfunction\s/, 'function ') // ios 16 bug which made await async function function ...
     const response = `onmessage=async (event)=>{postMessage(${func}(...event.data))}`
     let blob
     try {
