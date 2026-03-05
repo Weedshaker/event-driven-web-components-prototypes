@@ -44,7 +44,9 @@ export const WebWorker = (ChosenHTMLElement = HTMLElement) => class WebWorker ex
     func = func.replace(/(function\s)async\s(.*)/s, 'await async $1$2') // fix async function
     func = func.replace(/function\s#/, 'function ') // fix private functions
     func = func.replace(/function\sfunction\s/, 'function ') // ios 16 bug which made await async function function ...
-    const response = `onmessage=async (event)=>{postMessage(${func}(...event.data))}`
+    let response = `onmessage=async (event)=>{postMessage(${func}(...event.data))}`
+    // bypass trusted type sinks
+    if (document.querySelector('meta[http-equiv=Content-Security-Policy][content*=require-trusted-types-for]') && response.includes('eval')) response += `;self.trustedTypes.createPolicy('default', {createScript: string => string})`
     let blob
     try {
       blob = new Blob([response], { type: 'application/javascript' })
