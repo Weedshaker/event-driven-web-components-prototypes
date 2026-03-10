@@ -658,6 +658,8 @@ export default class Crypto extends WebWorker() {
         algorithm.namedCurve = jsonWebKey.crv || 'P-256'
       }
     }
+    // avoid duplicate usage error
+    if (jsonWebKey.key_ops) jsonWebKey.key_ops = Array.from(new Set(jsonWebKey.key_ops))
     try {
       return await self.crypto.subtle.importKey(
         // @ts-ignore
