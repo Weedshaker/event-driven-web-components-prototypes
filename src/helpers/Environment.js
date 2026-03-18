@@ -24,10 +24,10 @@ self.Environment = {
 
 /**
  * XSS Content Security Policy
- * 
+ *
  * https://content-security-policy.com/examples/meta/
  * is enforced by: <meta http-equiv="Content-Security-Policy" content="require-trusted-types-for 'script'">
- * 
+ *
  * Sink uses trusted type only: https://web.dev/articles/trusted-type
  * Avoid XSS attacks by sanitizing the html according to: https://developer.mozilla.org/en-US/docs/Web/Security/Attacks/XSS
  * and the target list: https://github.com/cure53/DOMPurify/blob/27e8496bcd689a16acc7d0bf7c88b933efad569a/demos/hooks-mentaljs-demo.html#L20
@@ -43,7 +43,7 @@ if (typeof self.trustedTypes?.createPolicy === 'function' && document.querySelec
   self.trustedTypes.createPolicy('default', {
     // first sanitize tags eg.: <img src="xyz" onload=alert('XSS')>, <img src="xyz" onmouseover=alert('XSS')>, <image/src/onerror=alert('XSS')>, etc.
     // second sanitize tags eg.: <a href="javascript:alert(document.location);">XSS</a>, <form action="javascript:alert(document.location);"><input type="submit" /></form>, etc.
-    createHTML: string => string.replace(/<[a-z]+[^>]*[\s|\/]on[a-z]{4,10}=[^>]*>/gi, '').replace(/<[a-z]+[\s|\/][^>]*javascript:[^>]*>/gi, ''),
+    createHTML: string => string.replace(/<[a-z]+[^>]*[\s|\/]on[a-z]{4,10}=[^>]*>/gi, '').replace(/<[a-z]+[\s|\/][^>]*javascript:[^>]*>/gi, ''), // eslint-disable-line
     createScriptURL: string => string, // unsafe but including webworker's, service workers, etc. is okay
     createScript: string => string // unsafe but eval at css templates is okay
   })

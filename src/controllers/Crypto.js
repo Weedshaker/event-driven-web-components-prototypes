@@ -2,6 +2,8 @@
 
 import { WebWorker } from '../WebWorker.js'
 
+/* global self */
+
 /** @typedef {{ privateKeyEpoch: string, publicKeyEpoch: string }} DERIVED_KEY */
 /** @typedef {{ epoch:string, derived?: DERIVED_KEY }} KEY_EPOCH */
 /** @typedef {JsonWebKey | string} JSONWEBKEY_STRING */
@@ -41,10 +43,10 @@ export default class Crypto extends WebWorker() {
     jsonWebKeysCache: new WeakMap(),
     /**
      * getKeysCache
-     * 
+     *
      * @returns {(key: CryptoKey | JSONWEBKEY_STRING) => CryptoKey | JSONWEBKEY_STRING | undefined}
      */
-    get get() {
+    get get () {
       return key => {
         if (key instanceof CryptoKey) {
           return this.jsonWebKeysCache.get(key)
@@ -57,10 +59,10 @@ export default class Crypto extends WebWorker() {
     },
     /**
      * hasKeysCache
-     * 
+     *
      * @returns {(key: CryptoKey | JSONWEBKEY_STRING) => boolean}
      */
-    get has() {
+    get has () {
       return key => {
         if (key instanceof CryptoKey) {
           return this.jsonWebKeysCache.has(key)
@@ -73,10 +75,10 @@ export default class Crypto extends WebWorker() {
     },
     /**
      * setKeysCache
-     * 
+     *
      * @returns {(jsonWebKey: JSONWEBKEY_STRING, cryptoKey: CryptoKey) => void}
      */
-    get set() {
+    get set () {
       return (jsonWebKey, cryptoKey) => {
         // @ts-ignore
         this.cryptoKeysCache.set(
@@ -87,7 +89,7 @@ export default class Crypto extends WebWorker() {
         )
         // @ts-ignore
         this.jsonWebKeysCache.set(
-          cryptoKey, 
+          cryptoKey,
           typeof jsonWebKey === 'string'
             ? JSON.parse(jsonWebKey)
             : jsonWebKey
@@ -178,7 +180,7 @@ export default class Crypto extends WebWorker() {
       )
     }
 
-    //await this.jsonWebKeyToCryptoKey(privateKey.jsonWebKey)
+    // await this.jsonWebKeyToCryptoKey(privateKey.jsonWebKey)
     /**
      * jsonWebKeyToCryptoKey Event Listener
      * user this to check the validity of the jsonWebKey
@@ -211,7 +213,7 @@ export default class Crypto extends WebWorker() {
   /** ---generateSyncKey--- */
   /**
    * get new synchronous JsonWebKey
-   * 
+   *
    * @async
    * @returns {Promise<KEY & {jsonWebKey: JSONWEBKEY_STRING}|GENERATE_SYNC_KEY_ERROR|CRYPTOKEY_TO_JSON_WEB_KEY_ERROR>}
    */
@@ -226,18 +228,20 @@ export default class Crypto extends WebWorker() {
     // @ts-ignore
     return key
   }
+
   /**
    * get new synchronous key
-   * 
+   *
    * @async
    * @returns {Promise<KEY|GENERATE_SYNC_KEY_ERROR>}
    */
   async generateSyncKey () {
     return this.webWorker(Crypto.#_generateSyncKey, Crypto.#epochDateNow)
   }
+
   /**
    * get new synchronous key
-   * 
+   *
    * @async
    * @static
    * @param {string} epoch
@@ -268,7 +272,7 @@ export default class Crypto extends WebWorker() {
   /** ---generateAsyncKeyPair--- */
   /**
    * get new asynchronous JsonWebKey pair
-   * 
+   *
    * @async
    * @returns {Promise<KEY_PAIR|GENERATE_ASYNC_KEY_PAIR_ERROR|CRYPTOKEY_TO_JSON_WEB_KEY_ERROR>}
    */
@@ -287,18 +291,20 @@ export default class Crypto extends WebWorker() {
     // @ts-ignore
     return keys
   }
+
   /**
    * get new asynchronous key pair
-   * 
+   *
    * @async
    * @returns {Promise<KEY_PAIR|GENERATE_ASYNC_KEY_PAIR_ERROR>}
    */
   async generateAsyncKeyPair () {
     return this.webWorker(Crypto.#_generateAsyncKeyPair, Crypto.#epochDateNow)
   }
+
   /**
    * get new asynchronous key pair
-   * 
+   *
    * @async
    * @static
    * @param {string} epoch
@@ -306,10 +312,10 @@ export default class Crypto extends WebWorker() {
    */
   static async #_generateAsyncKeyPair (epoch) {
     try {
-      const {publicKey, privateKey} = await self.crypto.subtle.generateKey(
+      const { publicKey, privateKey } = await self.crypto.subtle.generateKey(
         {
           name: 'ECDH',
-          namedCurve: 'P-256',
+          namedCurve: 'P-256'
         },
         true,
         ['deriveKey', 'deriveBits']
@@ -338,7 +344,7 @@ export default class Crypto extends WebWorker() {
    * deriveSyncKeyFromAsyncKeyPair JsonWebKeys
    * typically created with own privateKey and foreign publicKey
    * creates the same key with own privateKey and foreign publicKey as with own publicKey and foreign privateKey
-   * 
+   *
    * @async
    * @param {KEY & {jsonWebKey: JSONWEBKEY_STRING}} privateKey
    * @param {KEY & {jsonWebKey: JSONWEBKEY_STRING}} publicKey
@@ -375,11 +381,12 @@ export default class Crypto extends WebWorker() {
     // @ts-ignore
     return cryptoKey
   }
+
   /**
    * deriveSyncKeyFromAsyncKeyPair
    * typically created with own privateKey and foreign publicKey
    * creates the same key with own privateKey and foreign publicKey as with own publicKey and foreign privateKey
-   * 
+   *
    * @async
    * @param {KEY} privateKey
    * @param {KEY} publicKey
@@ -389,11 +396,12 @@ export default class Crypto extends WebWorker() {
   async deriveSyncKeyFromAsyncKeyPair (privateKey, publicKey, keyUsages = ['encrypt', 'decrypt']) {
     return this.webWorker(Crypto.#_deriveSyncKeyFromAsyncKeyPair, privateKey, publicKey, keyUsages, Crypto.#epochDateNow)
   }
+
   /**
    * deriveSyncKeyFromAsyncKeyPair
    * typically created with own privateKey and foreign publicKey
    * creates the same key with own privateKey and foreign publicKey as with own publicKey and foreign privateKey
-   * 
+   *
    * @async
    * @static
    * @param {KEY} privateKey
@@ -406,7 +414,7 @@ export default class Crypto extends WebWorker() {
     try {
       return {
         cryptoKey: await self.crypto.subtle.deriveKey(
-          { 
+          {
             name: 'ECDH',
             public: publicKey.cryptoKey
           },
@@ -437,7 +445,7 @@ export default class Crypto extends WebWorker() {
   /** ---encrypt--- */
   /**
    * encrypt by JsonWebKeys
-   * 
+   *
    * @async
    * @param {string} text
    * @param {KEY & {jsonWebKey: JSONWEBKEY_STRING}} key
@@ -461,9 +469,10 @@ export default class Crypto extends WebWorker() {
     if (mapKey) Crypto.#encryptedCache.set(mapKey, encrypted)
     return encrypted
   }
+
   /**
    * encrypt
-   * 
+   *
    * @async
    * @param {string} text
    * @param {KEY} key
@@ -472,9 +481,10 @@ export default class Crypto extends WebWorker() {
   async encrypt (text, key) {
     return this.webWorker(Crypto.#_encrypt, text, key, Crypto.#epochDateNow)
   }
+
   /**
    * encrypt
-   * 
+   *
    * @async
    * @static
    * @param {string} text
@@ -506,7 +516,7 @@ export default class Crypto extends WebWorker() {
           derived: key.derived
         }
       }
-    }  catch (error) {
+    } catch (error) {
       return {
         error: true,
         message: `Error encrypting text: ${error}`,
@@ -519,7 +529,7 @@ export default class Crypto extends WebWorker() {
   /** ---decrypt--- */
   /**
    * decrypt by JsonWebKeys
-   * 
+   *
    * @async
    * @param {ENCRYPTED} encrypted
    * @param {KEY & {jsonWebKey: JSONWEBKEY_STRING}} key
@@ -540,13 +550,14 @@ export default class Crypto extends WebWorker() {
     }
     const decrypted = await this.decrypt(encrypted, key)
     // @ts-ignore
-      if (decrypted.error) return decrypted
+    if (decrypted.error) return decrypted
     if (mapKey) Crypto.#decryptedCache.set(mapKey, decrypted)
     return decrypted
   }
+
   /**
    * decrypt
-   * 
+   *
    * @async
    * @param {ENCRYPTED} encrypted
    * @param {KEY} key
@@ -555,9 +566,10 @@ export default class Crypto extends WebWorker() {
   async decrypt (encrypted, key) {
     return this.webWorker(Crypto.#_decrypt, encrypted, key, Crypto.#epochDateNow)
   }
+
   /**
    * decrypt
-   * 
+   *
    * @async
    * @static
    * @param {ENCRYPTED} encrypted
@@ -566,11 +578,13 @@ export default class Crypto extends WebWorker() {
    * @returns {Promise<DECRYPTED|DECRYPTED_ERROR>}
    */
   static async #_decrypt (encrypted, key, epoch) {
-    if (!(encrypted.iv instanceof Uint8Array)) return {
-      error: true,
-      message: 'Error decrypting; iv not as Uint8Array supplied!',
-      encrypted,
-      key
+    if (!(encrypted.iv instanceof Uint8Array)) {
+      return {
+        error: true,
+        message: 'Error decrypting; iv not as Uint8Array supplied!',
+        encrypted,
+        key
+      }
     }
     try {
       const decrypted = JSON.parse(new TextDecoder().decode(await self.crypto.subtle.decrypt(
@@ -607,7 +621,7 @@ export default class Crypto extends WebWorker() {
   /** ---jsonWebKeyToCryptoKey + cryptoKeyToJsonWebKey--- */
   /**
    * jsonWebKeyToCryptoKey
-   * 
+   *
    * @async
    * @param {JSONWEBKEY_STRING} jsonWebKey
    * @param {AlgorithmIdentifier | RsaHashedImportParams | EcKeyImportParams | HmacImportParams | AesKeyAlgorithm | null} [algorithm=null]
@@ -624,9 +638,10 @@ export default class Crypto extends WebWorker() {
     Crypto.#jsonWebCryptoKeysCache.set(jsonWebKey, cryptoKey)
     return cryptoKey
   }
+
   /**
    * jsonWebKeyToCryptoKey
-   * 
+   *
    * @async
    * @static
    * @param {JsonWebKey} jsonWebKey
@@ -636,10 +651,12 @@ export default class Crypto extends WebWorker() {
    * @returns {Promise<CryptoKey|JSON_WEB_KEY_TO_CRYPTOKEY_ERROR>}
    */
   static async #_jsonWebKeyToCryptoKey (jsonWebKey, algorithm, keyUsages, format) {
-    if (!jsonWebKey) return {
-      error: true,
-      message: `Error missing JsonWebKey!`,
-      jsonWebKey
+    if (!jsonWebKey) {
+      return {
+        error: true,
+        message: 'Error missing JsonWebKey!',
+        jsonWebKey
+      }
     }
     if (typeof jsonWebKey === 'string') jsonWebKey = JSON.parse(jsonWebKey)
     if (!algorithm) {
@@ -648,7 +665,7 @@ export default class Crypto extends WebWorker() {
           ? 'AES-GCM'
           : jsonWebKey.kty === 'EC'
             ? 'ECDH'
-            : jsonWebKey.kty || 'AES-GCM',
+            : jsonWebKey.kty || 'AES-GCM'
       }
       if (algorithm.name === 'AES-GCM') {
         // @ts-ignore
@@ -667,9 +684,7 @@ export default class Crypto extends WebWorker() {
         jsonWebKey,
         algorithm,
         true,
-        keyUsages
-          ? keyUsages
-          : jsonWebKey.key_ops || []
+        keyUsages || jsonWebKey.key_ops || []
       )
     } catch (error) {
       return {
@@ -679,9 +694,10 @@ export default class Crypto extends WebWorker() {
       }
     }
   }
+
   /**
    * cryptoKeyToJsonWebKey
-   * 
+   *
    * @async
    * @param {CryptoKey} cryptoKey
    * @param {'jwk'} [format='jwk']
@@ -696,9 +712,10 @@ export default class Crypto extends WebWorker() {
     Crypto.#jsonWebCryptoKeysCache.set(jsonWebKey, cryptoKey)
     return jsonWebKey
   }
+
   /**
    * cryptoKeyToJsonWebKey
-   * 
+   *
    * @async
    * @static
    * @param {CryptoKey} cryptoKey

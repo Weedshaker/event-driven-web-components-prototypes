@@ -1,9 +1,9 @@
 /* global self */
 
 /**
- * Makes sure to have finished scrolling to the element, even if content on its way is lazy loaded and changing the scrollHeight. 
+ * Makes sure to have finished scrolling to the element, even if content on its way is lazy loaded and changing the scrollHeight.
  * Ether supply a selector making sure it is not yet intersecting e.g.: ':not([intersecting])' or it will calculate the position in screen ether on window (self) or the parent scroll element
- * 
+ *
  * @function
  * @name scrollElIntoView
  * @kind variable
@@ -26,11 +26,11 @@ export const scrollElIntoView = (getScrollElFunc, notIntersectingSelector = null
     const scrollEl = getScrollElFunc()
     if (!scrollEl) return
     let scrollElBoundingClientRect, parentScrollElBoundingClientRect
-    if (counter < counterMax 
-      && (notIntersectingSelector
+    if (counter < counterMax &&
+      (notIntersectingSelector
         ? scrollEl.matches(notIntersectingSelector)
-        : ((scrollElBoundingClientRect = scrollEl.getBoundingClientRect()) && (parentScrollElBoundingClientRect = parentScrollEl === self ? { y: 0, height: parentScrollEl.innerHeight } : parentScrollEl.getBoundingClientRect())
-          && (Math.round(scrollElBoundingClientRect.y) < Math.round(parentScrollElBoundingClientRect.y) || Math.round(scrollElBoundingClientRect.y + scrollElBoundingClientRect.height) > Math.round(parentScrollElBoundingClientRect.y + parentScrollElBoundingClientRect.height))))
+        : ((scrollElBoundingClientRect = scrollEl.getBoundingClientRect()) && (parentScrollElBoundingClientRect = parentScrollEl === self ? { y: 0, height: parentScrollEl.innerHeight } : parentScrollEl.getBoundingClientRect()) &&
+          (Math.round(scrollElBoundingClientRect.y) < Math.round(parentScrollElBoundingClientRect.y) || Math.round(scrollElBoundingClientRect.y + scrollElBoundingClientRect.height) > Math.round(parentScrollElBoundingClientRect.y + parentScrollElBoundingClientRect.height))))
     ) {
       // when counterMax recursion is not yet reached
       // and it is ether not intersecting by the notIntersectingSelector or the bounding client rect position relative to window (self) or a parentScrollEl
@@ -49,15 +49,14 @@ export const scrollElIntoView = (getScrollElFunc, notIntersectingSelector = null
   }, timeout)
 }
 
-
 // https://stackoverflow.com/questions/30661497/xss-prevention-and-innerhtml
-export const  escapeHTML = unsafe_str => {
-  if (typeof unsafe_str !== 'string') return ''
-  return unsafe_str
+export const escapeHTML = unsafeStr => {
+  if (typeof unsafeStr !== 'string') return ''
+  return unsafeStr
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
-    .replace(/\"/g, '&quot;')
-    .replace(/\'/g, '&#39;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
     .replace(/\//g, '&#x2F;')
 }

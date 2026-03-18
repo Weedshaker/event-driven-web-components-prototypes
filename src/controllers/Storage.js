@@ -285,7 +285,7 @@ export default class Storage extends WebWorker() {
       if (arrayFilter) {
         if (typeof arrayFilter === 'string') {
           try {
-            arrayFilter = eval(arrayFilter)
+            arrayFilter = eval(arrayFilter) // eslint-disable-line
           } catch (error) {}
         }
         if (typeof arrayFilter === 'function') result = result.filter(arrayFilter)
