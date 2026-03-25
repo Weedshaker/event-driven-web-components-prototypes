@@ -498,7 +498,7 @@ export default class Crypto extends WebWorker() {
     const iv = self.crypto.getRandomValues(new Uint8Array(12))
     try {
       return {
-        text: btoa(String.fromCharCode(...new Uint8Array(await self.crypto.subtle.encrypt(
+        text: btoa(Array.from(new Uint8Array(await self.crypto.subtle.encrypt(
           {
             name,
             iv
@@ -508,7 +508,7 @@ export default class Crypto extends WebWorker() {
             text,
             epoch
           }))
-        )))),
+        )), el => String.fromCharCode(el)).join('')),
         iv,
         name,
         key: {
