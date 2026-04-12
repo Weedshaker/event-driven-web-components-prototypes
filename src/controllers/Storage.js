@@ -80,10 +80,10 @@ export default class Storage extends WebWorker() {
         const oldValue = this.getListener(key, storage)
         this.oldStorage.set(key, structuredClone(oldValue))
         const newValue = await this.webWorker(Storage.deepMerge, oldValue, value, event.detail?.concat, event.detail?.maxLength, event.detail?.uniqueArray, event.detail?.uniqueMap, event.detail?.arrayFilter?.toString())
+        const success = this.setListener(key, newValue, storage)
         // @ts-ignore
         queueResolve()
         this.queue.splice(this.queue.indexOf(queuePromise), 1)
-        const success = this.setListener(key, newValue, storage)
         this.respond(event.detail?.resolve, 'storage-data', {
           key,
           value: success
