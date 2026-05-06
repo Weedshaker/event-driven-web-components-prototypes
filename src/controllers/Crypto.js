@@ -107,6 +107,7 @@ export default class Crypto extends WebWorker() {
 
   /**
    * caching the encrypted text by the jsonWebKey and plain text as map-key
+   * defaults to false and must be used by event.detail.useCache
    *
    * @type {Map<string, ENCRYPTED | ENCRYPTED_ERROR>}
    */
@@ -114,6 +115,7 @@ export default class Crypto extends WebWorker() {
 
   /**
    * caching the decrypted (plain) text by the jsonWebKey and encrypted text as map-key
+   * defaults to false and must be used by event.detail.useCache
    *
    * @type {Map<string, DECRYPTED | DECRYPTED_ERROR>}
    */
@@ -162,7 +164,7 @@ export default class Crypto extends WebWorker() {
      */
     this.encryptEventListener = event => {
       this.respond(event.detail?.resolve, event.detail?.name || 'crypto-encrypted', event.detail?.jsonWebKey
-        ? this.encryptWithJsonWebKey(event.detail.text, event.detail.key)
+        ? this.encryptWithJsonWebKey(event.detail.text, event.detail.key, event.detail.useCache)
         : this.encrypt(event.detail.text, event.detail.key)
       )
     }
@@ -175,7 +177,7 @@ export default class Crypto extends WebWorker() {
      */
     this.decryptEventListener = event => {
       this.respond(event.detail?.resolve, event.detail?.name || 'crypto-decrypted', event.detail?.jsonWebKey
-        ? this.decryptWithJsonWebKey(event.detail.encrypted, event.detail.key)
+        ? this.decryptWithJsonWebKey(event.detail.encrypted, event.detail.key, event.detail.useCache)
         : this.decrypt(event.detail.encrypted, event.detail.key)
       )
     }
@@ -449,10 +451,11 @@ export default class Crypto extends WebWorker() {
    * @async
    * @param {string} text
    * @param {KEY & {jsonWebKey: JSONWEBKEY_STRING}} key
+   * @param {boolean} [useCache=false]
    * @returns {Promise<ENCRYPTED | ENCRYPTED_ERROR | JSON_WEB_KEY_TO_CRYPTOKEY_ERROR>}
    */
-  async encryptWithJsonWebKey (text, key) {
-    const mapKey = key.jsonWebKey
+  async encryptWithJsonWebKey (text, key, useCache = false) {
+    const mapKey = useCache && key.jsonWebKey
       ? `${text}${this.separator}${typeof key.jsonWebKey === 'string' ? key.jsonWebKey : JSON.stringify(key.jsonWebKey)}`
       : null
     // @ts-ignore
@@ -533,11 +536,12 @@ export default class Crypto extends WebWorker() {
    * @async
    * @param {ENCRYPTED} encrypted
    * @param {KEY & {jsonWebKey: JSONWEBKEY_STRING}} key
+   * @param {boolean} [useCache=false]
    * @returns {Promise<DECRYPTED|DECRYPTED_ERROR|JSON_WEB_KEY_TO_CRYPTOKEY_ERROR>}
    */
-  async decryptWithJsonWebKey (encrypted, key) {
+  async decryptWithJsonWebKey (encrypted, key, useCache = false) {
     if (!(encrypted.iv instanceof Uint8Array) && typeof encrypted.iv === 'object') encrypted.iv = new Uint8Array(Object.values(encrypted.iv))
-    const mapKey = key.jsonWebKey
+    const mapKey = useCache && key.jsonWebKey
       ? `${encrypted.text}${this.separator}${encrypted.iv}${this.separator}${typeof key.jsonWebKey === 'string' ? key.jsonWebKey : JSON.stringify(key.jsonWebKey)}`
       : null
     // @ts-ignore
