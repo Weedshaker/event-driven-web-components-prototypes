@@ -1,0 +1,3 @@
+[submodule "src/controllers/wormhole-crypto"]
+	path = src/controllers/wormhole-crypto
+	url = https://github.com/webtorrent/wormhole-crypto.git

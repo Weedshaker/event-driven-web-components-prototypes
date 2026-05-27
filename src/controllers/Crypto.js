@@ -1,6 +1,7 @@
 // @ts-check
 
 import { WebWorker } from '../WebWorker.js'
+import { Keychain } from './wormhole-crypto/lib/keychain.js' // TODO: import module lazy
 
 /* global self */
 
@@ -9,12 +10,12 @@ import { WebWorker } from '../WebWorker.js'
 /** @typedef {JsonWebKey | string} JSONWEBKEY_STRING */
 /** @typedef {{ cryptoKey: CryptoKey, jsonWebKey?: JSONWEBKEY_STRING | string, epoch: string, derived?: DERIVED_KEY }} KEY */
 /** @typedef {{ publicKey: KEY, privateKey: KEY }} KEY_PAIR */
-/** @typedef {{ text: string, iv: Uint8Array<ArrayBuffer>, name: string, key: KEY_EPOCH }} ENCRYPTED */ // text: JSON.stringify({text: string, epoch: string})
-/** @typedef {{ text: string, epoch: string, encrypted: { epoch: string, key: KEY_EPOCH }, key: KEY_EPOCH }} DECRYPTED */
+/** @typedef {{ text: string|ReadableStream, iv: Uint8Array<ArrayBuffer>, name: string, key: KEY_EPOCH }} ENCRYPTED */ // text: JSON.stringify({text: string, epoch: string})
+/** @typedef {{ text: string|ReadableStream, epoch: string, encrypted: { epoch: string|null, key: KEY_EPOCH|null }, key: KEY_EPOCH }} DECRYPTED */
 /** @typedef {{ error: true, message: string, epoch: string }} GENERATE_SYNC_KEY_ERROR */
 /** @typedef {{ error: true, message: string, epoch: string }} GENERATE_ASYNC_KEY_PAIR_ERROR */
 /** @typedef {{ error: true, message: string, privateKey: KEY, publicKey: KEY }} DERIVE_ERROR */
-/** @typedef {{ error: true, message: string, text: string, key: KEY }} ENCRYPTED_ERROR */
+/** @typedef {{ error: true, message: string, text: string|ReadableStream, key: KEY }} ENCRYPTED_ERROR */
 /** @typedef {{ error: true, message: string, encrypted: ENCRYPTED, key: KEY }} DECRYPTED_ERROR */
 /** @typedef {{ error: true, message: string, jsonWebKey: JsonWebKey }} JSON_WEB_KEY_TO_CRYPTOKEY_ERROR */
 /** @typedef {{ error: true, message: string, cryptoKey: CryptoKey, format: 'jwk' }} CRYPTOKEY_TO_JSON_WEB_KEY_ERROR */
@@ -164,8 +165,8 @@ export default class Crypto extends WebWorker() {
      */
     this.encryptEventListener = event => {
       this.respond(event.detail?.resolve, event.detail?.name || 'crypto-encrypted', event.detail?.jsonWebKey
-        ? this.encryptWithJsonWebKey(event.detail.text, event.detail.key, event.detail.useCache)
-        : this.encrypt(event.detail.text, event.detail.key)
+        ? this.encryptWithJsonWebKey(event.detail.text, event.detail.key, event.detail.iv, event.detail.useCache)
+        : this.encrypt(event.detail.text, event.detail.key, event.detail.iv)
       )
     }
 
@@ -451,10 +452,11 @@ export default class Crypto extends WebWorker() {
    * @async
    * @param {string} text
    * @param {KEY & {jsonWebKey: JSONWEBKEY_STRING}} key
+   * @param {Uint8Array} [iv=undefined]
    * @param {boolean} [useCache=false]
    * @returns {Promise<ENCRYPTED | ENCRYPTED_ERROR | JSON_WEB_KEY_TO_CRYPTOKEY_ERROR>}
    */
-  async encryptWithJsonWebKey (text, key, useCache = false) {
+  async encryptWithJsonWebKey (text, key, iv = undefined, useCache = false) {
     const mapKey = useCache && key.jsonWebKey
       ? `${text}${this.separator}${typeof key.jsonWebKey === 'string' ? key.jsonWebKey : JSON.stringify(key.jsonWebKey)}`
       : null
@@ -466,7 +468,7 @@ export default class Crypto extends WebWorker() {
       // @ts-ignore
       if (key.cryptoKey.error) return key.cryptoKey
     }
-    const encrypted = await this.encrypt(text, key)
+    const encrypted = await this.encrypt(text, key, iv)
     // @ts-ignore
     if (encrypted.error) return encrypted
     if (mapKey) Crypto.#encryptedCache.set(mapKey, encrypted)
@@ -477,12 +479,14 @@ export default class Crypto extends WebWorker() {
    * encrypt
    *
    * @async
-   * @param {string} text
+   * @param {string|ReadableStream} text
    * @param {KEY} key
+   * @param {Uint8Array} [iv=undefined]
    * @returns {Promise<ENCRYPTED|ENCRYPTED_ERROR>}
    */
-  async encrypt (text, key) {
-    return this.webWorker(Crypto.#_encrypt, text, key, Crypto.#epochDateNow)
+  async encrypt (text, key, iv = undefined) {
+    if (text instanceof ReadableStream) return Crypto.#_encryptStream(text, key, iv)
+    return this.webWorker(Crypto.#_encrypt, text, key, Crypto.#epochDateNow, iv)
   }
 
   /**
@@ -493,13 +497,14 @@ export default class Crypto extends WebWorker() {
    * @param {string} text
    * @param {KEY} key
    * @param {string} epoch
+   * @param {Uint8Array} [iv=undefined]
    * @returns {Promise<ENCRYPTED|ENCRYPTED_ERROR>}
    */
-  static async #_encrypt (text, key, epoch) {
+  static async #_encrypt (text, key, epoch, iv = undefined) {
     const name = 'AES-GCM'
-    // IV should be 96 bits long [96 bits / 8 = 12 bytes] and unique for each encryption (https://developer.mozilla.org/en-US/docs/Web/API/AesGcmParams#iv)
-    const iv = self.crypto.getRandomValues(new Uint8Array(12))
     try {
+      // IV should be 96 bits long [96 bits / 8 = 12 bytes] and unique for each encryption (https://developer.mozilla.org/en-US/docs/Web/API/AesGcmParams#iv)
+      if (!iv) iv = self.crypto.getRandomValues(new Uint8Array(12))
       return {
         text: btoa(Array.from(new Uint8Array(await self.crypto.subtle.encrypt(
           {
@@ -524,6 +529,39 @@ export default class Crypto extends WebWorker() {
         error: true,
         message: `Error encrypting text: ${error}`,
         text,
+        key
+      }
+    }
+  }
+
+  /**
+   * encryptStream
+   *
+   * @async
+   * @static
+   * @param {ReadableStream} stream
+   * @param {KEY} key
+   * @param {Uint8Array} [iv=undefined]
+   * @returns {Promise<ENCRYPTED|ENCRYPTED_ERROR>}
+   */
+  static async #_encryptStream (stream, key, iv = undefined) {
+    const name = 'wormhole-crypto'
+    try {
+      const keychain = new Keychain(await Crypto.#_cryptoKeyToUint8Array(key), iv)
+      return {
+        text: await keychain.encryptStream(stream),
+        iv: keychain.salt,
+        name,
+        key: {
+          epoch: key.epoch,
+          derived: key.derived
+        }
+      }
+    } catch (error) {
+      return {
+        error: true,
+        message: `Error encrypting text: ${error}`,
+        text: stream,
         key
       }
     }
@@ -568,6 +606,7 @@ export default class Crypto extends WebWorker() {
    * @returns {Promise<DECRYPTED|DECRYPTED_ERROR>}
    */
   async decrypt (encrypted, key) {
+    if (encrypted.text instanceof ReadableStream) return Crypto.#_decryptStream(encrypted, key, Crypto.#epochDateNow)
     return this.webWorker(Crypto.#_decrypt, encrypted, key, Crypto.#epochDateNow)
   }
 
@@ -597,6 +636,7 @@ export default class Crypto extends WebWorker() {
           iv: encrypted.iv
         },
         key.cryptoKey,
+        // @ts-ignore
         Uint8Array.from(atob(encrypted.text), char => char.charCodeAt(0))
       )))
       if (!decrypted.text || !decrypted.epoch) throw new Error(`JSON with property text was expected at encrypted text! Only decrypt strings which were encrypted with this class. | ${JSON.stringify(decrypted)}`)
@@ -620,6 +660,60 @@ export default class Crypto extends WebWorker() {
         key
       }
     }
+  }
+
+  /**
+   * decrypt
+   *
+   * @async
+   * @static
+   * @param {ENCRYPTED} encrypted
+   * @param {KEY} key
+   * @param {string} epoch
+   * @returns {Promise<DECRYPTED|DECRYPTED_ERROR>}
+   */
+  static async #_decryptStream (encrypted, key, epoch) {
+    if (!(encrypted.iv instanceof Uint8Array)) {
+      return {
+        error: true,
+        message: 'Error decrypting; iv not as Uint8Array supplied!',
+        encrypted,
+        key
+      }
+    }
+    try {
+      return {
+        text: await new Keychain(await Crypto.#_cryptoKeyToUint8Array(key), encrypted.iv).decryptStream(encrypted.text),
+        epoch,
+        encrypted: {
+          epoch: null,
+          key: null
+        },
+        key: {
+          epoch: key.epoch,
+          derived: key.derived
+        }
+      }
+    } catch (error) {
+      return {
+        error: true,
+        message: `Error decrypting encrypted: ${error}`,
+        encrypted,
+        key
+      }
+    }
+  }
+
+  /**
+   * turn normal CryptoKey 256 to a 128-bit key to a Uint8Array with 16 bytes
+   * 
+   * @async
+   * @static
+   * @param {KEY} key
+   * @returns {Promise<Uint8Array>}
+   */
+  static async #_cryptoKeyToUint8Array (key) {
+    return new Uint8Array(await crypto.subtle.digest('SHA-256', await crypto.subtle.exportKey('raw', key.cryptoKey))).slice(0, 16)
   }
 
   /** ---jsonWebKeyToCryptoKey + cryptoKeyToJsonWebKey--- */
