@@ -10,12 +10,12 @@ import { Keychain } from './wormhole-crypto/lib/keychain.js' // TODO: import mod
 /** @typedef {JsonWebKey | string} JSONWEBKEY_STRING */
 /** @typedef {{ cryptoKey: CryptoKey, jsonWebKey?: JSONWEBKEY_STRING | string, epoch: string, derived?: DERIVED_KEY }} KEY */
 /** @typedef {{ publicKey: KEY, privateKey: KEY }} KEY_PAIR */
-/** @typedef {{ text: string|ReadableStream, iv: Uint8Array<ArrayBuffer>, name: string, key: KEY_EPOCH }} ENCRYPTED */ // text: JSON.stringify({text: string, epoch: string})
+/** @typedef {{ text: string|ReadableStream|File, iv: Uint8Array<ArrayBuffer>, name: string, key: KEY_EPOCH, start?: number, length?: number, fileLength?:number }} ENCRYPTED */ // text: JSON.stringify({text: string, epoch: string})
 /** @typedef {{ text: string|ReadableStream, epoch: string, encrypted: { epoch: string|null, key: KEY_EPOCH|null }, key: KEY_EPOCH }} DECRYPTED */
 /** @typedef {{ error: true, message: string, epoch: string }} GENERATE_SYNC_KEY_ERROR */
 /** @typedef {{ error: true, message: string, epoch: string }} GENERATE_ASYNC_KEY_PAIR_ERROR */
 /** @typedef {{ error: true, message: string, privateKey: KEY, publicKey: KEY }} DERIVE_ERROR */
-/** @typedef {{ error: true, message: string, text: string|ReadableStream, key: KEY }} ENCRYPTED_ERROR */
+/** @typedef {{ error: true, message: string, text: string|ReadableStream|File, key: KEY }} ENCRYPTED_ERROR */
 /** @typedef {{ error: true, message: string, encrypted: ENCRYPTED, key: KEY }} DECRYPTED_ERROR */
 /** @typedef {{ error: true, message: string, jsonWebKey: JsonWebKey }} JSON_WEB_KEY_TO_CRYPTOKEY_ERROR */
 /** @typedef {{ error: true, message: string, cryptoKey: CryptoKey, format: 'jwk' }} CRYPTOKEY_TO_JSON_WEB_KEY_ERROR */
@@ -606,7 +606,8 @@ export default class Crypto extends WebWorker() {
    * @returns {Promise<DECRYPTED|DECRYPTED_ERROR>}
    */
   async decrypt (encrypted, key) {
-    if (encrypted.text instanceof ReadableStream) return Crypto.#_decryptStream(encrypted, key, Crypto.#epochDateNow)
+    // @ts-ignore
+    if (typeof encrypted.text.stream === 'function') return Crypto.#_decryptStream(encrypted, key, Crypto.#epochDateNow)
     return this.webWorker(Crypto.#_decrypt, encrypted, key, Crypto.#epochDateNow)
   }
 
@@ -682,8 +683,16 @@ export default class Crypto extends WebWorker() {
       }
     }
     try {
+      const keychain = new Keychain(await Crypto.#_cryptoKeyToUint8Array(key), encrypted.iv)
+      const { ranges, decrypt } = await keychain.decryptStreamRange(encrypted.start, encrypted.length, encrypted.fileLength)
+      /** @type {any} */
+      const file = encrypted.text
+      const encryptedStreams = ranges.map(range => file.stream({
+        start: range.offset,
+        end: range.offset + range.length - 1
+      }))
       return {
-        text: await new Keychain(await Crypto.#_cryptoKeyToUint8Array(key), encrypted.iv).decryptStream(encrypted.text),
+        text: await decrypt(encryptedStreams),
         epoch,
         encrypted: {
           epoch: null,
