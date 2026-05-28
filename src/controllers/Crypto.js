@@ -684,15 +684,21 @@ export default class Crypto extends WebWorker() {
     }
     try {
       const keychain = new Keychain(await Crypto.#_cryptoKeyToUint8Array(key), encrypted.iv)
-      const { ranges, decrypt } = await keychain.decryptStreamRange(encrypted.start, encrypted.length, encrypted.fileLength)
       /** @type {any} */
       const file = encrypted.text
-      const encryptedStreams = ranges.map(range => file.stream({
-        start: range.offset,
-        end: range.offset + range.length - 1
-      }))
+      let result
+      if (encrypted.start) {
+        const { ranges, decrypt } = await keychain.decryptStreamRange(encrypted.start, encrypted.length, encrypted.fileLength)
+        const encryptedStreams = ranges.map(range => file.stream({
+          start: range.offset,
+          end: range.offset + range.length - 1
+        }))
+        result = await decrypt(encryptedStreams)
+      } else {
+        result = await keychain.decryptStream(file.stream())
+      }
       return {
-        text: await decrypt(encryptedStreams),
+        text: result,
         epoch,
         encrypted: {
           epoch: null,
