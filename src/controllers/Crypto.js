@@ -239,7 +239,9 @@ export default class Crypto extends WebWorker() {
    * @returns {Promise<KEY|GENERATE_SYNC_KEY_ERROR>}
    */
   async generateSyncKey () {
-    return this.webWorker(Crypto.#_generateSyncKey, Crypto.#epochDateNow)
+    return this.isMacOSSafari()
+      ? Crypto.#_generateSyncKey(Crypto.#epochDateNow)
+      : this.webWorker(Crypto.#_generateSyncKey, Crypto.#epochDateNow)
   }
 
   /**
@@ -302,7 +304,9 @@ export default class Crypto extends WebWorker() {
    * @returns {Promise<KEY_PAIR|GENERATE_ASYNC_KEY_PAIR_ERROR>}
    */
   async generateAsyncKeyPair () {
-    return this.webWorker(Crypto.#_generateAsyncKeyPair, Crypto.#epochDateNow)
+    return this.isMacOSSafari()
+      ? Crypto.#_generateAsyncKeyPair(Crypto.#epochDateNow)
+      : this.webWorker(Crypto.#_generateAsyncKeyPair, Crypto.#epochDateNow)
   }
 
   /**
@@ -397,7 +401,9 @@ export default class Crypto extends WebWorker() {
    * @returns {Promise<KEY|DERIVE_ERROR>}
    */
   async deriveSyncKeyFromAsyncKeyPair (privateKey, publicKey, keyUsages = ['encrypt', 'decrypt']) {
-    return this.webWorker(Crypto.#_deriveSyncKeyFromAsyncKeyPair, privateKey, publicKey, keyUsages, Crypto.#epochDateNow)
+    return this.isMacOSSafari()
+      ? Crypto.#_deriveSyncKeyFromAsyncKeyPair(privateKey, publicKey, keyUsages, Crypto.#epochDateNow)
+      : this.webWorker(Crypto.#_deriveSyncKeyFromAsyncKeyPair, privateKey, publicKey, keyUsages, Crypto.#epochDateNow)
   }
 
   /**
@@ -486,7 +492,9 @@ export default class Crypto extends WebWorker() {
    */
   async encrypt (text, key, iv = undefined) {
     if (text instanceof ReadableStream) return Crypto.#_encryptStream(text, key, iv)
-    return this.webWorker(Crypto.#_encrypt, text, key, Crypto.#epochDateNow, iv)
+    return this.isMacOSSafari()
+      ? Crypto.#_encrypt(text, key, Crypto.#epochDateNow, iv)
+      : this.webWorker(Crypto.#_encrypt, text, key, Crypto.#epochDateNow, iv)
   }
 
   /**
@@ -608,7 +616,9 @@ export default class Crypto extends WebWorker() {
   async decrypt (encrypted, key) {
     // @ts-ignore
     if (typeof encrypted.text.stream === 'function') return Crypto.#_decryptStream(encrypted, key, Crypto.#epochDateNow)
-    return this.webWorker(Crypto.#_decrypt, encrypted, key, Crypto.#epochDateNow)
+    return this.isMacOSSafari()
+      ? Crypto.#_decrypt(encrypted, key, Crypto.#epochDateNow)
+      : this.webWorker(Crypto.#_decrypt, encrypted, key, Crypto.#epochDateNow)
   }
 
   /**
@@ -745,7 +755,10 @@ export default class Crypto extends WebWorker() {
   async jsonWebKeyToCryptoKey (jsonWebKey, algorithm = null, keyUsages = null, format = 'jwk') {
     // @ts-ignore
     if (Crypto.#jsonWebCryptoKeysCache.has(jsonWebKey)) return Crypto.#jsonWebCryptoKeysCache.get(jsonWebKey)
-    const cryptoKey = await this.webWorker(Crypto.#_jsonWebKeyToCryptoKey, jsonWebKey, algorithm, keyUsages, format)
+    const cryptoKey = await this.isMacOSSafari()
+      // @ts-ignore
+      ? Crypto.#_jsonWebKeyToCryptoKey(jsonWebKey, algorithm, keyUsages, format)
+      : this.webWorker(Crypto.#_jsonWebKeyToCryptoKey, jsonWebKey, algorithm, keyUsages, format)
     // @ts-ignore
     if (cryptoKey.error) return cryptoKey
     Crypto.#jsonWebCryptoKeysCache.set(jsonWebKey, cryptoKey)
@@ -819,7 +832,9 @@ export default class Crypto extends WebWorker() {
   async cryptoKeyToJsonWebKey (cryptoKey, format = 'jwk') {
     // @ts-ignore
     if (Crypto.#jsonWebCryptoKeysCache.has(cryptoKey)) return Crypto.#jsonWebCryptoKeysCache.get(cryptoKey)
-    let jsonWebKey = await this.webWorker(Crypto.#_cryptoKeyToJsonWebKey, cryptoKey, format)
+    let jsonWebKey = await this.isMacOSSafari()
+      ? Crypto.#_cryptoKeyToJsonWebKey(cryptoKey, format)
+      : this.webWorker(Crypto.#_cryptoKeyToJsonWebKey, cryptoKey, format)
     if (jsonWebKey.error) return jsonWebKey
     jsonWebKey = Object.freeze(jsonWebKey)
     Crypto.#jsonWebCryptoKeysCache.set(jsonWebKey, cryptoKey)
@@ -873,5 +888,15 @@ export default class Crypto extends WebWorker() {
         composed: true
       }))
     }
+  }
+
+  // detect safari, since safari can not send cryptoKey to webWorker nor back... so we deactivate webWorker for all safari
+  isMacOSSafari () {
+    if (this._isMacOSSafari) return this._isMacOSSafari
+    const userAgent = navigator.userAgent
+    const isSafari = /Safari/.test(userAgent) && !/Chrome|Chromium|Edg|OPR|Firefox/.test(userAgent)
+    const isMac = /Macintosh/.test(userAgent)
+    const isIOS = /iPhone|iPad|iPod/.test(userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) // iPadOS
+    return (this._isMacOSSafari = isSafari && isMac && !isIOS)
   }
 }
