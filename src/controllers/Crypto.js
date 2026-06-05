@@ -919,6 +919,6 @@ export default class Crypto extends WebWorker() {
     const isSafari = /Safari/.test(userAgent) && !/Chrome|Chromium|Edg|OPR|Firefox/.test(userAgent)
     const isMac = /Macintosh/.test(userAgent)
     const isIOS = /iPhone|iPad|iPod/.test(userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) // iPadOS
-    return (this._isSafariMacIos = isSafari && isMac && isIOS)
+    return (this._isSafariMacIos = isSafari || isMac || isIOS)
   }
 }
