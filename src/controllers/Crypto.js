@@ -622,7 +622,6 @@ export default class Crypto extends WebWorker() {
   async decrypt (encrypted, key) {
     // @ts-ignore
     if (encrypted.text instanceof ReadableStream || typeof encrypted.text.stream === 'function' || encrypted.start !== undefined) {
-      if (this.isSafariMacIos()) return Crypto.#_decryptStream(encrypted, key, Crypto.#epochDateNow)
       if (encrypted.start !== undefined) {
         // no cross reference in webworker
         //const keychain = new Keychain(await Crypto.#_cryptoKeyToUint8Array(key), encrypted.iv)
@@ -635,6 +634,7 @@ export default class Crypto extends WebWorker() {
           end: range.offset + range.length - 1
         }))
       }
+      if (this.isSafariMacIos()) return Crypto.#_decryptStream(encrypted, key, Crypto.#epochDateNow)
       return this.webWorker(`${Crypto.#_decryptStream.toLocaleString()}//import { Keychain } from '${this.importMetaUrl}./wormhole-crypto-esm/keychain.bundle.js'`, encrypted, key, Crypto.#epochDateNow)
     }
     return this.isSafariMacIos()
@@ -912,7 +912,7 @@ export default class Crypto extends WebWorker() {
     }
   }
 
-  // detect safari, since safari can not send cryptoKey to webWorker nor back... so we deactivate webWorker for all safari
+  // detect safari, since safari can not send cryptoKey and ReadableStream to webWorker nor back... so we deactivate webWorker for all safari
   isSafariMacIos () {
     if (this._isSafariMacIos) return this._isSafariMacIos
     const userAgent = navigator.userAgent
