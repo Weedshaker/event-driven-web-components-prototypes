@@ -1,0 +1,1 @@
+npx esbuild ./wormhole-crypto/lib/keychain.js --bundle --format=esm --outfile=./wormhole-crypto-esm/keychain.bundle.js
