@@ -621,7 +621,7 @@ export default class Crypto extends WebWorker() {
    */
   async decrypt (encrypted, key) {
     // @ts-ignore
-    if (encrypted.text instanceof ReadableStream || typeof encrypted.text.stream === 'function' || encrypted.start !== undefined) {
+    if (encrypted.text instanceof ReadableStream || (typeof encrypted.text.stream === 'function' && encrypted.start !== undefined)) {
       if (encrypted.start !== undefined) {
         // no cross reference in webworker
         //const keychain = new Keychain(await Crypto.#_cryptoKeyToUint8Array(key), encrypted.iv)
