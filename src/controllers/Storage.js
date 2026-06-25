@@ -27,6 +27,18 @@ export default class Storage extends WebWorker() {
 
     this.oldStorage = new Map()
 
+    // https://developer.mozilla.org/en-US/docs/Web/API/StorageManager/persist
+    if (this.hasAttribute('persist') && navigator.storage && typeof navigator.storage.persist === 'function') {
+      document.body.addEventListener('click', event => {
+        navigator.storage.persist().then(persistent => {
+          console.info(persistent
+            ? 'NOTE: Storage will not be cleared except by explicit user action'
+            : 'NOTE: Storage may be cleared by the UA under storage pressure.'
+          )
+        })
+      }, { once: true })
+    }
+
     /**
      * Listens to the event name/typeArg: 'set'
      *
