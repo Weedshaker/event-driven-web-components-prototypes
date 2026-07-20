@@ -6,7 +6,7 @@
   "scripts": {
     "fix": "standard --fix"
   },
-  "author": "weedshaker@gmail.com",
+  "author": "weedshaker@starsystems.ch",
   "license": "MIT",
   "devDependencies": {
     "standard": "*"
