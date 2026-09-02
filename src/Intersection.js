@@ -1,6 +1,7 @@
 // @ts-check
 
 /* global IntersectionObserver */
+/* global self */
 
 import { Shadow } from './Shadow.js'
 

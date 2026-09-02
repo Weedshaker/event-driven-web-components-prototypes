@@ -1,5 +1,7 @@
 /* global self */
 /* global location */
+/* global Sanitizer */
+/* global Document */
 
 const currentScriptUrl = new URL(document.currentScript.src)
 
@@ -56,7 +58,7 @@ if (typeof self.trustedTypes?.createPolicy === 'function' && !self.trustedTypes.
         // remove all 1. on... attribute containing nodes
         if (captureAttributeName) return ''
         if (captureAttributeValue !== undefined) {
-          const cleanedMatch = match.replace(/[\u0000-\u0020]/g, '')
+          const cleanedMatch = match.replace(/[\u0000-\u0020]/g, '') // eslint-disable-line
           // remove all 2. by testing all attribute values for javascript, vbscript, data and any decimal and hexadecimal html entity
           if (/(javascript|vbscript|data|&(?:#[0-9]{1,7}|#x[0-9a-f]{1,6}))([^"'<>]*)(?::|&colon;?|&#(?:x0*3a|0*58);?)/i.test(cleanedMatch)) return ''
           // remove all 2. by testing for strings javascript, vbscript and data obfuscated with named html entities eg.: &tab; <a href="j&Tab;avascript:alert(1)"> , j&notanentity;avascript: , etc.

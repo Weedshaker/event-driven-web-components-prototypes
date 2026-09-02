@@ -628,7 +628,7 @@ export default class Crypto extends WebWorker() {
         // no cross reference in webworker
         // const keychain = new Keychain(await Crypto.#_cryptoKeyToUint8Array(key), encrypted.iv)
         const keychain = new Keychain(new Uint8Array(await crypto.subtle.digest('SHA-256', await crypto.subtle.exportKey('raw', key.cryptoKey))).slice(0, 16), encrypted.iv)
-        const { ranges, decrypt } = await keychain.decryptStreamRange(encrypted.start, encrypted.length, encrypted.fileLength)
+        const { ranges } = await keychain.decryptStreamRange(encrypted.start, encrypted.length, encrypted.fileLength)
         // replace type File with a ReadableStream ranges
         // @ts-ignore
         encrypted.text = ranges.map(range => encrypted.text.stream({
@@ -721,7 +721,7 @@ export default class Crypto extends WebWorker() {
       const keychain = new Keychain(new Uint8Array(await crypto.subtle.digest('SHA-256', await crypto.subtle.exportKey('raw', key.cryptoKey))).slice(0, 16), encrypted.iv)
       let result
       if (encrypted.start !== undefined) {
-        const { ranges, decrypt } = await keychain.decryptStreamRange(encrypted.start, encrypted.length, encrypted.fileLength)
+        const { decrypt } = await keychain.decryptStreamRange(encrypted.start, encrypted.length, encrypted.fileLength)
         // we can not pass File (encrypted.text) through the webworker message channel, thats why the stream gets truncated before sent to the webworker
         /* const encryptedStreams = ranges.map(range => encrypted.text.stream({
           start: range.offset,
