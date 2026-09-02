@@ -52,9 +52,11 @@ export const scrollElIntoView = (getScrollElFunc, notIntersectingSelector = null
 // https://stackoverflow.com/questions/30661497/xss-prevention-and-innerhtml
 export const escapeHTML = (unsafeStr, lightCheck = false) => {
   if (typeof unsafeStr !== 'string') return ''
-  if (lightCheck) return unsafeStr
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
+  if (lightCheck) {
+    return unsafeStr
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+  }
   return unsafeStr
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')

@@ -493,9 +493,11 @@ export default class Crypto extends WebWorker() {
    * @returns {Promise<ENCRYPTED|ENCRYPTED_ERROR>}
    */
   async encrypt (text, key, iv = undefined) {
-    if (text instanceof ReadableStream) return this.isSafariMacIos()
-      ? Crypto.#_encryptStream(text, key, iv)
-      : this.webWorker(`${Crypto.#_encryptStream.toLocaleString()}//import { Keychain } from '${this.importMetaUrl}./wormhole-crypto-esm/keychain.bundle.js'`, text, key, iv)
+    if (text instanceof ReadableStream) {
+      return this.isSafariMacIos()
+        ? Crypto.#_encryptStream(text, key, iv)
+        : this.webWorker(`${Crypto.#_encryptStream.toLocaleString()}//import { Keychain } from '${this.importMetaUrl}./wormhole-crypto-esm/keychain.bundle.js'`, text, key, iv)
+    }
     return this.isSafariMacIos()
       ? Crypto.#_encrypt(text, key, Crypto.#epochDateNow, iv)
       : this.webWorker(Crypto.#_encrypt, text, key, Crypto.#epochDateNow, iv)
@@ -560,7 +562,7 @@ export default class Crypto extends WebWorker() {
     const name = 'wormhole-crypto'
     try {
       // no cross reference in webworker
-      //const keychain = new Keychain(await Crypto.#_cryptoKeyToUint8Array(key), iv)
+      // const keychain = new Keychain(await Crypto.#_cryptoKeyToUint8Array(key), iv)
       const keychain = new Keychain(new Uint8Array(await crypto.subtle.digest('SHA-256', await crypto.subtle.exportKey('raw', key.cryptoKey))).slice(0, 16), iv)
       return {
         text: await keychain.encryptStream(stream),
@@ -624,7 +626,7 @@ export default class Crypto extends WebWorker() {
     if (encrypted.text instanceof ReadableStream || (typeof encrypted.text.stream === 'function' && encrypted.start !== undefined)) {
       if (encrypted.start !== undefined) {
         // no cross reference in webworker
-        //const keychain = new Keychain(await Crypto.#_cryptoKeyToUint8Array(key), encrypted.iv)
+        // const keychain = new Keychain(await Crypto.#_cryptoKeyToUint8Array(key), encrypted.iv)
         const keychain = new Keychain(new Uint8Array(await crypto.subtle.digest('SHA-256', await crypto.subtle.exportKey('raw', key.cryptoKey))).slice(0, 16), encrypted.iv)
         const { ranges, decrypt } = await keychain.decryptStreamRange(encrypted.start, encrypted.length, encrypted.fileLength)
         // replace type File with a ReadableStream ranges
@@ -715,16 +717,16 @@ export default class Crypto extends WebWorker() {
     }
     try {
       // no cross reference in webworker
-      //const keychain = new Keychain(await Crypto.#_cryptoKeyToUint8Array(key), encrypted.iv)
+      // const keychain = new Keychain(await Crypto.#_cryptoKeyToUint8Array(key), encrypted.iv)
       const keychain = new Keychain(new Uint8Array(await crypto.subtle.digest('SHA-256', await crypto.subtle.exportKey('raw', key.cryptoKey))).slice(0, 16), encrypted.iv)
       let result
       if (encrypted.start !== undefined) {
         const { ranges, decrypt } = await keychain.decryptStreamRange(encrypted.start, encrypted.length, encrypted.fileLength)
         // we can not pass File (encrypted.text) through the webworker message channel, thats why the stream gets truncated before sent to the webworker
-        /*const encryptedStreams = ranges.map(range => encrypted.text.stream({
+        /* const encryptedStreams = ranges.map(range => encrypted.text.stream({
           start: range.offset,
           end: range.offset + range.length - 1
-        }))*/
+        })) */
         result = await decrypt(encrypted.text)
       } else {
         result = await keychain.decryptStream(encrypted.text)
@@ -753,7 +755,7 @@ export default class Crypto extends WebWorker() {
 
   /**
    * turn normal CryptoKey 256 to a 128-bit key to a Uint8Array with 16 bytes
-   * 
+   *
    * @async
    * @static
    * @param {KEY} key

@@ -92,7 +92,7 @@ export const WebWorker = (ChosenHTMLElement = HTMLElement) => class WebWorker ex
       const triggerWorker = () => {
         worker.onmessage = (e) => resolve(e.data)
         worker.onerror = (e) => reject(e)
-        worker.postMessage(args, {transfer: isModule ? WebWorker.getAllReadableStreams(args) : []}) // can only have one argument as message
+        worker.postMessage(args, { transfer: isModule ? WebWorker.getAllReadableStreams(args) : [] }) // can only have one argument as message
       }
       promise ? promise.finally(() => triggerWorker()) : triggerWorker()
     })
