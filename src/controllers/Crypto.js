@@ -566,7 +566,7 @@ export default class Crypto extends WebWorker() {
       const keychain = new Keychain(new Uint8Array(await crypto.subtle.digest('SHA-256', await crypto.subtle.exportKey('raw', key.cryptoKey))).slice(0, 16), iv)
       return {
         text: await keychain.encryptStream(stream),
-        iv: keychain.salt,
+        iv: iv || keychain.salt,
         name,
         key: {
           epoch: key.epoch,
