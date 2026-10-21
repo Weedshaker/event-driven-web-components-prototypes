@@ -70,10 +70,13 @@ export const WebWorker = (ChosenHTMLElement = HTMLElement) => class WebWorker ex
       blob.append(response)
       blob = blob.getBlob()
     }
-    const worker = new Worker(URL.createObjectURL(blob), isModule
+    const blobUrl = URL.createObjectURL(blob)
+    const worker = new Worker(blobUrl, isModule
       ? { type: 'module' }
       : {}
     )
+    worker.addEventListener('error', error => console.error('Worker Error:', {error, blobUrl}))
+    worker.addEventListener('messageerror', error => console.error('Worker message deserialization failed:', {error, blobUrl}))
     const promise = WebWorker.getWebWorkerPromise(worker, args, undefined, isModule)
     this.webWorkerMap.set(key, { worker, promise })
     return promise
